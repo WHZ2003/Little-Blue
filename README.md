@@ -16,6 +16,10 @@
 
 ## 立即启动
 
+新增**独立浏览器**：Docker 中运行她自己的 Chromium，低频自主阅读科普网页，真实标题、来源和摘录进入原有记忆。右键桌宠 → **她的浏览器…**，或运行 `browser.ps1`，可随时查看、接管和暂停。重启浏览器默认暂停，点击“让她自己逛”开启；详见 [独立浏览器说明](docs/independent-browser.md)。
+
+有趣的浏览内容可偶尔通过微信分享：短话加真实链接，允许沉默、限频且受勿扰控制，`/sharing off` 可关闭。Windows 私聊／群聊桥接已准备核心接口和隔离记忆，但本机微信 4.1.15.56 的 UIA 发送者信息缺失，**尚未替换 iLink**；兼容性证据和剩余验证见 [Windows 桥接说明](docs/windows-wechat-bridge.md)。
+
 打包版：打开 `dist/LittleBlue/LittleBlue.exe`。请保留同目录的 `_internal` 文件夹，不能只复制 EXE。
 
 源码版（当前工作区已配置 `.venv`）：
@@ -107,7 +111,7 @@ python tools\preview_ui.py
 - 环境感知默认关闭，不读取窗口标题。全屏识别当前针对主屏；手动勿扰始终有效。截图只按用户明确的保存操作执行，不上传给模型。
 - 任务以最多 5 轮认知、每轮最多 4 个工具调用限制；总超时 240 秒，审批最长 120 秒。取消不回滚已经完成的外部操作。
 - 提醒仅在应用运行时触发，退出期间到期的提醒会在下次启动后交付；勿扰期间延后交付。
-- 已验证一次真实 DeepSeek 文字回复及微信收发记录；尚未完成更新后由微信提问、模型生成并返回微信的整条链路实测。真实网页服务、Playwright 和锁屏尚未进行端到端操作测试。
+- 已验证真实 DeepSeek 文字回复及微信收发记录。独立浏览器已通过真实 Chromium 页面读取与接管测试；旧网页搜索工具、锁屏和长期运行仍未完整实测，详细结果见 [验证记录](docs/validation.md)。
 - 数据库的损坏修复、记忆编辑/删除 UI、系统原生 Focus Assist 集成、签名安装器和自动更新尚未实现。
 
 仓库评估见 [docs/repository-research.md](docs/repository-research.md)，设计与阶段验收见 [docs/architecture.md](docs/architecture.md)，素材生成说明见 [docs/art-assets.md](docs/art-assets.md)。本项目不是 DeepSeek 官方产品。

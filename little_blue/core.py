@@ -65,6 +65,9 @@ class Core:
         self.phone = Phone(store)
         self.tools = DelegatingTools(self)
         self.agent = Agent(store, self.settings, self.tools, client)
+        from .memory_ledger import FactLearner
+        self.fact_learner = FactLearner(store, self.settings, self.agent.client,
+            lambda: self.current is not None or self.wechat_receiving or self.env.interacting)
         self.gate = ProactiveGate(store)
         self.pending = {}
         self.events = deque(maxlen=100)
@@ -83,6 +86,12 @@ class Core:
         self.wechat_state = 'unbound'
         self.wechat_ready = False
         self.wechat_receiving = False
+        from .browser import BrowserRuntime
+        self.browser = BrowserRuntime(self)
+        from .browser_share import BrowserShare
+        self.browser_share = BrowserShare(self)
+        from .bridge import BridgeHub
+        self.bridge = BridgeHub(self)
 
     @property
     def host_connected(self):
@@ -117,6 +126,7 @@ class Core:
                 'relationship': self.store.continuity.snapshot(),
                 'memory_index': self.memory.status(),
                 'phone': self.phone.snapshot(),
+                'browser': self.browser.snapshot(), 'bridge': self.bridge.snapshot(),
                 'settings': self.settings.model_dump(),
                 'life': {'needs': self.life.needs.model_dump(),
                          'emotion': self.life.emotion.model_dump(),
@@ -241,6 +251,8 @@ class Core:
 
     async def start(self):
         await self.memory.start()
+        await self.fact_learner.start()
+        await self.browser.start()
         self.loop_task = asyncio.create_task(self._loop())
 
     async def _loop(self):
@@ -257,11 +269,12 @@ class Core:
                 self.env = Environment(hour=time.localtime().tm_hour, focused=self.settings.dnd)
             before = self.life.goal
             self.life.tick(dt, self.env)
-            self.phone.tick(dt, self.life, self.env, busy=self.current is not None,
+            self.phone.tick(dt, self.life, self.env, busy=self.current is not None or self.browser.snapshot()['active'],
                             manual_present=self.host_connected and self.env.phone_open)
             if before != self.life.goal:
                 self.store.working.append(f'自主目标：{self.life.goal}')
             wall = time.time()
+            self.bridge.tick()
             idle = self.env.idle_seconds
             if idle is not None:
                 if idle < 60:
@@ -283,11 +296,12 @@ class Core:
                               source_id=self.store.get('current_activity')['source_id'])
                 elif (self.settings.proactive and self.work_seconds > 3000 and wall - self.last_break > 3000
                         and idle is not None and idle >= 45 and not self.env.interacting
-                        and (not self.gate.times or wall - self.gate.times[-1] >= self.settings.proactive_cooldown)
-                        and len(self.gate.times) < self.settings.proactive_per_hour):
+                        and self.gate.available(wall, self.settings, self.env)):
                     self.gate.claim(wall)
                     self.last_break, self.work_seconds = wall, 0
                     self.emit('notice', text='已经忙了很久啦。方便的时候，起来活动一下吧。')
+                elif self.browser_share.tick(wall):
+                    pass
                 elif self.gate.eligible(wall, self.settings, self.env, self.life.needs):
                     self.gate.claim(wall)
                     self.submit('根据状态和记忆简短主动交流，不调用工具。', proactive=True,
@@ -305,6 +319,10 @@ class Core:
             self.loop_task.cancel()
             await asyncio.gather(self.loop_task, return_exceptions=True)
         await self.cancel()
+        await self.fact_learner.close()
+        await self.browser.close()
+        await self.browser_share.close()
+        await self.bridge.close()
         await self.memory.close()
         self.phone.stop(time.time(), '手机已保存，休息一下。')
         for item in self.pending.values():

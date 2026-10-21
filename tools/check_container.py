@@ -103,6 +103,17 @@ try:
     assert restored['current'] is None
     assert not rpc('identity')['enabled']
     assert rpc('search', text='container persistence check')['rows']
+    memory = rpc('memory_manage', memory_command={'action': 'view'})
+    memory = rpc('memory_manage', memory_command={'action': 'revise', 'revision': memory['revision'],
+        'key': 'user.container_check.status', 'text': 'container fact before', 'reason': 'isolated smoke test'})
+    memory = rpc('memory_manage', memory_command={'action': 'revise', 'revision': memory['revision'],
+        'key': 'user.container_check.status', 'text': 'container fact after', 'reason': 'isolated correction'})
+    assert [r['text'] for r in rpc('search', text='container fact')['rows']
+            if r['text'].startswith('container fact')] == ['container fact after']
+    memory = rpc('memory_manage', memory_command={'action': 'undo', 'revision': memory['revision']})
+    assert [r['text'] for r in rpc('search', text='container fact')['rows']
+            if r['text'].startswith('container fact')] == ['container fact before']
+    assert len([r for r in memory['rows'] if r['text'].startswith('container fact')]) == 2
     assert any(t['id'] == task_id and t['status'] == 'succeeded' for t in restored['tasks'])
     assert [m['role'] for m in restored['relationship']['messages']] == ['user', 'assistant']
     assert restored['relationship']['messages'][0]['text'] == 'offline smoke check'

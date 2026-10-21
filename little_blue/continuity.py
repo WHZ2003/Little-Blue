@@ -19,6 +19,54 @@ class Continuity:
                 store.db.execute("ALTER TABLE conversation ADD COLUMN delivery TEXT NOT NULL DEFAULT 'legacy'")
             # In-flight sends are never resumed or assumed delivered after restart.
             store.db.execute("UPDATE conversation SET delivery='failed' WHERE delivery='pending'")
+            store.db.execute('''CREATE TABLE IF NOT EXISTS conversation_inbox(
+                message_id INTEGER PRIMARY KEY REFERENCES conversation(id),
+                state TEXT NOT NULL, updated REAL NOT NULL)''')
+            store.db.execute("UPDATE conversation_inbox SET state='interrupted' WHERE state IN ('received','processing')")
+
+    def admit(self, channel, external_id, text):
+        """Commit deduplication and receipt together; never persist a channel token."""
+        now = time.time()
+        with self.store.lock, self.store.db:
+            if not self.store.db.execute('INSERT OR IGNORE INTO channel_messages VALUES(?,?,?)',
+                    (channel, external_id, self.store.now())).rowcount:
+                return None
+            mid = self.store.db.execute(
+                "INSERT INTO conversation(role,origin,text,created,delivery) VALUES('user','wechat',?,?, 'legacy')",
+                (text[:6000], now)).lastrowid
+            self.store.db.execute('INSERT INTO conversation_inbox VALUES(?,?,?)', (mid, 'received', now))
+            self.store.db.execute("INSERT OR REPLACE INTO kv VALUES('last_user_at',?)", (str(now),))
+            return mid
+
+    def inbox_state(self, ids, state):
+        if state not in ('received', 'processing', 'answered', 'silent', 'failed', 'cancelled', 'interrupted', 'rejected'):
+            raise ValueError('Invalid inbox state')
+        with self.store.lock, self.store.db:
+            self.store.db.executemany('''INSERT INTO conversation_inbox VALUES(?,?,?)
+                ON CONFLICT(message_id) DO UPDATE SET state=excluded.state, updated=excluded.updated''',
+                [(i, state, time.time()) for i in ids if i is not None])
+
+    def cancel_inbox(self):
+        with self.store.lock, self.store.db:
+            self.store.db.execute("UPDATE conversation_inbox SET state='cancelled', updated=? WHERE state IN ('received','processing')", (time.time(),))
+
+    def interrupt_inbox(self):
+        with self.store.lock, self.store.db:
+            self.store.db.execute("UPDATE conversation_inbox SET state='interrupted', updated=? WHERE state IN ('received','processing')", (time.time(),))
+
+    def supersede(self, message_id):
+        with self.store.lock, self.store.db:
+            self.store.db.execute("UPDATE conversation SET delivery='superseded' WHERE id=? AND delivery='pending'", (message_id,))
+
+    def history(self, before=None, limit=40):
+        """Only confirmed dialogue, with a boundary excluding not-yet-claimed input."""
+        with self.store.lock:
+            rows = self.store.db.execute('''SELECT c.* FROM conversation c
+                LEFT JOIN conversation_inbox i ON i.message_id=c.id WHERE c.id < ?
+                AND c.delivery IN ('legacy','delivered') AND COALESCE(i.state,'') != 'received'
+                ORDER BY c.id DESC LIMIT ?''',
+                (before or 9223372036854775807, min(200, max(1, limit)))).fetchall()
+        return [dict(r) for r in reversed(rows)]
 
     def append(self, role, text, origin, now=None, delivery='legacy'):
         if role not in ('user', 'assistant') or origin not in ('desktop', 'wechat'):
@@ -55,13 +103,23 @@ class Continuity:
         return [dict(r) for r in reversed(rows)]
 
     def snapshot(self):
-        return {'messages': self.recent(), 'activity': self.store.get('current_activity'),
-                'followups': self.store.get('activity_followups', True)}
+        return {'messages': [r for r in self.recent() if r['delivery'] not in ('pending', 'superseded')],
+                'activity': self.store.get('current_activity'),
+                'followups': self.store.get('activity_followups', True),
+                'topic_summary': self.store.get('conversation_summary')}
 
     def describe(self):
         a = self.store.get('current_activity')
         status = {'active': '进行中', 'done': '已完成', 'paused': '已暂停'}
         text = (f"你之前告诉我：{a['title']}（{status[a['status']]}）。" if a else '还没有记下你正在忙的事。')
+        summary = self.store.get('conversation_summary')
+        if summary:
+            text += '\n话题摘要（较早对话，最新原话优先）：' + summary['text']
+            text += '\n依据消息：' + ', '.join(map(str, summary['source_ids']))
+        recent = [r for r in self.history(limit=8) if not r['text'].startswith('/')][-4:]
+        if recent:
+            text += '\n最近聊到（原话节选）：\n' + '\n'.join(
+                ('你：' if r['role'] == 'user' else 'DeepSeek：') + r['text'][:160] for r in recent)
         return text + '\n适时跟进：' + ('开' if self.store.get('activity_followups', True) else '关')
 
     def observe(self, text, origin, source_id, now=None):

@@ -70,7 +70,9 @@ async def test_current_identity_survives_historical_nickname(components, online)
     client = DeepSeekClient(store, settings, httpx.MockTransport(handler), api_key='test')
     await Agent(store, settings, tools, client).run('大肥鱼，你是谁？', {}, chat_only=True)
     assert len(requests) == int(online)
-    assert 'DeepSeek：' in store.search('', 1)[0]['text']
+    # Unconfirmed WeChat drafts are not durable relationship memories.
+    assert store.continuity.recent()[-1]['delivery'] == 'pending'
+    assert store.search('', 1)[0]['kind'] == 'semantic'
 
 
 async def test_api_error_is_sanitized_and_task_failed(components):

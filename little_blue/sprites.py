@@ -41,6 +41,7 @@ class SpriteBank:
             return pixmap
 
         sheet = load(data["sheet"]) if data.get("sheet") else None
+        base_sheet = sheet
         columns, rows = int(data.get("columns", 1)), int(data.get("rows", 1))
         if not (1 <= columns <= 32 and 1 <= rows <= 32):
             raise ValueError("图集行列数无效。")
@@ -55,6 +56,10 @@ class SpriteBank:
         total = 0
         for action, config in data["animations"].items():
             Action(action)
+            # A replacement clip can use its own atlas without regenerating
+            # the user's approved idle, expressions and other animations.
+            sheet = load(config['sheet']) if config.get('sheet') else base_sheet
+            edges = None if config.get('sheet') else row_edges
             fps = float(config.get("fps", 6))
             if not 1 <= fps <= 60:
                 raise ValueError("帧率必须在 1–60 之间。")
@@ -81,8 +86,8 @@ class SpriteBank:
                 if not 0 <= row < rows:
                     raise ValueError("动画行号越界。")
                 w, h = sheet.width() // columns, sheet.height() // rows
-                y = row_edges[row] if row_edges else row * h
-                height = row_edges[row + 1] - y if row_edges else h
+                y = edges[row] if edges else row * h
+                height = edges[row + 1] - y if edges else h
                 frames = [sheet.copy(col * w, y, w, height) for col in range(columns)]
             else:
                 raise ValueError("动画缺少 frames 或 sheet。")

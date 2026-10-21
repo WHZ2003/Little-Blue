@@ -40,7 +40,10 @@ class Life:
         self.rng = random.Random(seed)
         self.elapsed = 0.0
         self.goal = "settle"
-        self.tree = Sequence(TimedAction(Action.IDLE, 4))
+        self.tree = Sequence(TimedAction(Action.IDLE, 30))
+        # All roaming goals share a cooldown; alternating "explore" and
+        # "stroll" must not bypass a quiet period.
+        self.roam_after = 30.0
         self.cooldowns = {}
         self.scores = {}
         self.direction = self.rng.choice([-1, 1])
@@ -69,6 +72,7 @@ class Life:
             self.override_until = self.elapsed + (4 if long_drag else 1)
             if long_drag:
                 self.needs.change("mood", -12)
+            self.settle(60, 120)
             return
         if self.elapsed - self.last_interaction < .6:
             return
@@ -79,23 +83,34 @@ class Life:
         self.needs.change("boredom", -6)
         self.override = Action.HAPPY if kind == "pet" else Action.JUMP
         self.override_until = self.elapsed + 2
+        self.settle(30, 60)
+
+    def settle(self, duration, roam_delay):
+        """Keep the position the user chose; explicit reactions still play."""
+        self.goal = "observe"
+        self.tree = Sequence(TimedAction(Action.IDLE, duration))
+        self.roam_after = max(self.roam_after, self.elapsed + roam_delay)
 
     def utilities(self, env):
         n, p = self.needs, self.personality
         scores = {
             "rest": max(0, 65 - n.energy) * 2.3 + (15 if env.hour < 7 else 0),
-            "explore": n.curiosity * p.curiosity + n.boredom * .3,
-            "play": n.boredom * p.playfulness + n.energy * .18,
-            "stroll": n.boredom * .5 + 18 * p.independence,
-            "observe": 18 + (25 if env.focused else 0),
+            "explore": (n.curiosity * p.curiosity + n.boredom * .3) * .35,
+            "play": (n.boredom * p.playfulness + n.energy * .18) * .2,
+            "stroll": (n.boredom * .5 + 18 * p.independence) * .3,
+            "observe": 55 + (80 if env.focused else 0),
         }
         if n.energy < 20:
             return {k: (1000 if k == "rest" else 0) for k in scores}
         for k in scores:
             if self.cooldowns.get(k, 0) > self.elapsed:
                 scores[k] = 0
-            elif k == self.goal:
+            elif k == self.goal and k != 'observe':
                 scores[k] *= .15
+        if self.elapsed < self.roam_after or env.focused or env.interacting or env.phone_open:
+            scores['explore'] = scores['stroll'] = 0
+        if env.focused or env.interacting or env.phone_open:
+            scores['play'] = 0
         return scores
 
     def choose(self, env):
@@ -103,14 +118,16 @@ class Life:
         choices, weights = zip(*self.scores.items())
         goal = self.rng.choices(choices, weights=weights)[0] if sum(weights) else "observe"
         self.goal = goal
-        self.direction = self.rng.choice([-1, 1])
-        duration = self.rng.uniform(5, 12)
+        if goal in ('explore', 'stroll'):
+            self.direction = self.rng.choice([-1, 1])
+            self.roam_after = self.elapsed + self.rng.uniform(90, 180)
+        duration = self.rng.uniform(2, 4)
         plans = {
-            "rest": [(Action.IDLE, 2), (Action.SLEEP, self.rng.uniform(35, 65))],
-            "explore": [(Action.WALK, duration), (Action.IDLE, 3), (Action.JUMP, 1.5)],
-            "play": [(Action.RUN, duration / 2), (Action.JUMP, 1.5), (Action.HAPPY, 3)],
-            "stroll": [(Action.WALK, duration), (Action.IDLE, 4)],
-            "observe": [(Action.IDLE, duration)],
+            "rest": [(Action.IDLE, 2), (Action.SLEEP, self.rng.uniform(60, 120))],
+            "explore": [(Action.WALK, duration), (Action.IDLE, self.rng.uniform(35, 65))],
+            "play": [(Action.HAPPY, 1.5), (Action.IDLE, self.rng.uniform(45, 90))],
+            "stroll": [(Action.WALK, duration), (Action.IDLE, self.rng.uniform(35, 65))],
+            "observe": [(Action.IDLE, self.rng.uniform(35, 75))],
         }
         self.tree = Sequence(*(TimedAction(a, d) for a, d in plans[goal]))
 
@@ -119,7 +136,7 @@ class Life:
         self.elapsed += dt
         a, n = self.action, self.needs
         n.change("energy", (1.1 if a == Action.SLEEP else -.055 if a == Action.IDLE else -.22) * dt)
-        n.change("boredom", (.14 if a in (Action.IDLE, Action.SLEEP) else -.65) * dt)
+        n.change("boredom", (.035 if a == Action.IDLE else -.025 if a == Action.SLEEP else -.65) * dt)
         n.change("curiosity", (-.6 if self.goal == "explore" else .08) * dt)
         n.change("social", .035 * dt)
         n.change("mood", (65 - n.mood) * dt / 600)
@@ -135,8 +152,10 @@ class Life:
             return
         if n.energy < 10 and self.goal != "rest":
             self.choose(env)
+        elif (env.focused or env.interacting or env.phone_open) and a not in (Action.IDLE, Action.SLEEP):
+            self.settle(45, 90)
         elif self.tree.tick(dt):
-            self.cooldowns[self.goal] = self.elapsed + (90 if self.goal == "rest" else 18)
+            self.cooldowns[self.goal] = self.elapsed + (90 if self.goal == "rest" else 120 if self.goal == 'play' else 0 if self.goal == 'observe' else 60)
             self.choose(env)
 
 

@@ -1,0 +1,5 @@
+# Optional Windows process only; do not install in the Docker core.
+pywinauto==0.6.9
+psutil>=5.9.5,<8
+pywin32>=308
+pillow>=11,<13

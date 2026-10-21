@@ -100,25 +100,25 @@ class MemoryRetrieval:
 
     async def search(self, query, limit=8):
         limit = max(1, min(limit, 30))
-        lexical = self.store.search(query, min(60, limit * 3))
+        lexical = self.store.search_candidates(query, min(60, limit * 3))
         if not str(query).strip() or not self.enabled or not self.ready:
-            return lexical[:limit]
+            return self.store.ledger.rank(lexical, query, limit)
         try:
             # Leave room for the desktop adapter's 2-second HTTP timeout.
             async with asyncio.timeout(1.5):
                 result = await self._request({'op': 'search', 'query': str(query)[:2000], 'limit': limit * 3})
         except TimeoutError:
             self.store.audit('memory_vector', 'query_timeout_keyword_fallback')
-            return lexical[:limit]
+            return self.store.ledger.rank(lexical, query, limit)
         if not self.enabled:
-            return lexical[:limit]
+            return self.store.ledger.rank(lexical, query, limit)
         semantic = []
         with self.store.lock:
             for hit in result.get('hits', []):
                 row = self.store.db.execute('SELECT * FROM memories WHERE id=?', (hit['id'],)).fetchone()
                 if row:
                     semantic.append({**dict(row), 'similarity': hit['similarity']})
-        return fuse(lexical, semantic, limit)
+        return self.store.ledger.rank(fuse(lexical, semantic, 60), query, limit)
 
     async def control(self, action):
         if action not in ('status', 'on', 'off', 'rebuild'):

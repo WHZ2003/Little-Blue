@@ -14,12 +14,13 @@ from .core import Core
 from .models import Model, Environment, Settings
 from .storage import Store
 from .phone import PhoneCommand, GameError
+from .memory_ledger import MemoryCommand
 
 CORE_KEY = web.AppKey('core', Core)
 
 class Command(Model):
     op: Literal['sync', 'configure', 'interact', 'direction', 'submit', 'cancel',
-                'resolve', 'search', 'remember', 'audit', 'disconnect', 'identity', 'phone', 'memory_index']
+                'resolve', 'search', 'remember', 'audit', 'disconnect', 'identity', 'phone', 'memory_index', 'memory_manage', 'browser', 'bridge']
     host: str = Field(pattern=r'^[a-f0-9]{32}$')
     after: int = Field(0, ge=0)
     environment: Environment | None = None
@@ -37,9 +38,12 @@ class Command(Model):
     revision: int | None = Field(None, ge=0)
     phone: PhoneCommand | None = None
     memory_action: Literal['status', 'on', 'off', 'rebuild'] = 'status'
+    memory_command: MemoryCommand | None = None
+    browser_action: Literal['view', 'status', 'auto', 'pause', 'manual', 'share_now'] = 'status'
+    bridge_action: Literal['status', 'bind', 'activate', 'pause', 'resume', 'ilink'] = 'status'
 
 
-def create_app(store, token, client=None, wechat_path=None):
+def create_app(store, token, client=None, wechat_path=None, bridge_token=None):
     if len(token) < 32:
         raise ValueError('Core token must contain at least 32 characters')
     core = Core(store, client)
@@ -51,7 +55,8 @@ def create_app(store, token, client=None, wechat_path=None):
             return web.json_response({'error': 'browser_origin_denied'}, status=403)
         if request.path != '/healthz':
             supplied = request.headers.get('Authorization', '')
-            if not hmac.compare_digest(supplied.encode(), ('Bearer ' + token).encode()):
+            expected = bridge_token if request.path == '/bridge' else token
+            if not expected or not hmac.compare_digest(supplied.encode(), ('Bearer ' + expected).encode()):
                 return web.json_response({'error': 'unauthorized'}, status=401)
         try:
             return await handler(request)
@@ -84,8 +89,21 @@ def create_app(store, token, client=None, wechat_path=None):
                 raise ValueError('missing environment')
             core.claim_host(command.host, command.environment.model_dump())
             return web.json_response(core.snapshot(command.after, command.host))
+        if command.op == 'browser':
+            if command.browser_action == 'share_now':
+                return web.json_response(await core.browser_share.request_once())
+            return web.json_response(await core.browser.control(command.browser_action))
+        if command.op == 'bridge':
+            return web.json_response(await core.bridge.admin(command.bridge_action, command.value))
         core.require_host(command.host)
         op = command.op
+        if op == 'memory_manage':
+            cmd = command.memory_command
+            if cmd is None:
+                raise ValueError('Missing memory command')
+            if cmd.action == 'search':
+                await core.store.search_hybrid(cmd.query, 20)
+            return web.json_response(core.store.ledger.control(cmd))
         if op == 'phone':
             if command.phone is None:
                 raise ValueError('missing phone command')
@@ -149,6 +167,30 @@ def create_app(store, token, client=None, wechat_path=None):
     app.router.add_get('/healthz', health)
     app.router.add_get('/state', state)
     app.router.add_post('/rpc', rpc)
+    from .bridge import Incoming, Strict
+    class BridgeCommand(Strict):
+        action: Literal['heartbeat', 'receive', 'pull', 'begin', 'ack']
+        instance: str = Field(pattern=r'^[a-f0-9]{32}$')
+        account: str = Field('', max_length=128)
+        version: str = Field('', max_length=40)
+        status: Literal['ready','locked','disconnected','logged_out','unreadable'] = 'unreadable'
+        event: Incoming | None = None
+        id: str = Field('', max_length=64)
+        result: Literal['sent','failed','unknown'] = 'unknown'
+
+    async def bridge_rpc(request):
+        cmd = BridgeCommand.model_validate(await request.json())
+        hub = core.bridge
+        if cmd.action == 'heartbeat':
+            result = hub.heartbeat(cmd.account, cmd.instance, cmd.version, cmd.status)
+        elif cmd.action == 'receive':
+            if cmd.instance != hub.instance or cmd.event is None:
+                raise PermissionError('Bridge instance mismatch')
+            result = hub.receive(cmd.event)
+        else:
+            result = hub.delivery(cmd.instance, cmd.action, cmd.id, cmd.result)
+        return web.json_response(result)
+    app.router.add_post('/bridge', bridge_rpc)
     return app
 
 
@@ -166,7 +208,9 @@ def main():
     logging.getLogger('httpx').setLevel(logging.WARNING)
     logging.getLogger('httpcore').setLevel(logging.WARNING)
     store = Store(args.data_dir / 'memory.sqlite3')
-    web.run_app(create_app(store, token, wechat_path=args.data_dir / 'wechat-account.json'), host=args.host, port=args.port,
+    bridge_file = Path(os.getenv('LITTLE_BLUE_BRIDGE_TOKEN_FILE', '/run/secrets/bridge_token'))
+    bridge_token = bridge_file.read_text().strip() if bridge_file.exists() else None
+    web.run_app(create_app(store, token, wechat_path=args.data_dir / 'wechat-account.json', bridge_token=bridge_token), host=args.host, port=args.port,
                 access_log=None, print=None, shutdown_timeout=8)
 
 

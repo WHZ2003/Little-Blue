@@ -6,6 +6,7 @@ import threading
 import time
 from urllib.parse import urlsplit
 import uuid
+import webbrowser
 
 import httpx
 from PySide6.QtCore import QObject, Signal
@@ -83,8 +84,11 @@ class RemoteWorker(QObject):
     error = Signal(str)
     identity_result = Signal(object)
     identity_error = Signal(str)
+    memory_result = Signal(object)
+    memory_error = Signal(str)
     phone_result = Signal(object)
     phone_error = Signal(str)
+    browser_url = Signal(str)
 
     def __init__(self, store, url, headers):
         super().__init__()
@@ -164,6 +168,17 @@ class RemoteWorker(QObject):
                 self.error.emit('核心操作未完成；没有自动重试，请确认连接后再操作。')
         self._schedule(run())
 
+    def manage_memory(self, command):
+        async def run():
+            try:
+                if not self.connected:
+                    raise RuntimeError('Disconnected')
+                self.memory_result.emit(await self.rpc('memory_manage', memory_command=command))
+            except Exception:
+                self.memory_error.emit('记忆操作未确认，可能状态已更新或输入无效。')
+        if self._schedule(run()) is None:
+            self.memory_error.emit('核心尚未连接。')
+
     def identity(self, action, revision=None):
         async def run():
             try:
@@ -197,6 +212,18 @@ class RemoteWorker(QObject):
                 self.memory.emit(rows['rows'])
             except Exception:
                 self.error.emit('记忆查询失败，请检查核心连接。')
+        self._schedule(run())
+
+    def browser_view(self):
+        async def run():
+            try:
+                result = await self.rpc('browser', browser_action='view')
+                url = result['url']
+                if not url.startswith('http://127.0.0.1:8766/?ticket='):
+                    raise ValueError('Invalid viewer URL')
+                self.browser_url.emit(url)
+            except Exception:
+                self.error.emit('浏览器尚未启动或连接失败，请运行 start-core.ps1。')
         self._schedule(run())
 
     def submit(self, text, state, proactive=False, reflection=False):
@@ -317,6 +344,7 @@ class RemoteWorker(QObject):
 class RemoteController(Controller):
     def __init__(self, app, state, url, headers, asset_root, data_dir):
         self.connected = False
+        self.last_core_direction = None
         store = RemoteStore(state)
         worker = RemoteWorker(store, url, headers)
         super().__init__(app, store, asset_root, data_dir, worker=worker)
@@ -329,9 +357,12 @@ class RemoteController(Controller):
         worker.memory.connect(self.panel.show_memories)
         worker.connectivity.connect(self.connection_changed)
         worker.error.connect(self.show_feedback)
+        worker.browser_url.connect(webbrowser.open)
         worker.start(self.settings)
 
     def connection_changed(self, connected):
+        if connected and not self.connected:
+            self.last_core_direction = None
         if self.connected and not connected:
             self.dismiss_approvals()
             self.busy = False
@@ -345,7 +376,12 @@ class RemoteController(Controller):
         self.life.needs = Needs.model_validate(life['needs'])
         self.life.emotion = Emotion.model_validate(life['emotion'])
         self.life.elapsed, self.life.goal = life['elapsed'], life['goal']
-        self.life.scores, self.life.direction = life['scores'], life['direction']
+        self.life.scores = life['scores']
+        # Repeated snapshots can predate a local edge bounce. Do not overwrite
+        # that local turn with the same stale direction every poll.
+        if self.last_core_direction != life['direction']:
+            self.life.direction = life['direction']
+        self.last_core_direction = life['direction']
         self.life.override, self.life.override_until = Action(life['action']), float('inf')
         current = state['current']
         self.busy = current is not None

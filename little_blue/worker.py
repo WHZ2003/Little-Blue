@@ -10,6 +10,8 @@ from .tools import ToolRuntime
 class Worker(QObject):
     result = Signal(str, str, bool)
     approval = Signal(str, str, str)
+    memory_result = Signal(object)
+    memory_error = Signal(str)
 
     def __init__(self, store, settings):
         super().__init__()
@@ -23,11 +25,15 @@ class Worker(QObject):
         store.retriever = self.memory
         self.tools = ToolRuntime(store, settings, self._approve)
         self.agent = Agent(store, settings, self.tools)
+        from .memory_ledger import FactLearner
+        self.fact_learner = FactLearner(store, settings, self.agent.client,
+                                      lambda: any(not f.done() for f in self.jobs.values()))
         self.thread.start()
 
     def _loop(self):
         asyncio.set_event_loop(self.loop)
         self.loop.run_until_complete(self.memory.start())
+        self.loop.run_until_complete(self.fact_learner.start())
         self.loop.run_forever()
         remaining = asyncio.all_tasks(self.loop)
         for task in remaining:
@@ -37,6 +43,16 @@ class Worker(QObject):
         self.loop.run_until_complete(self.memory.close())
         self.loop.run_until_complete(self.loop.shutdown_asyncgens())
         self.loop.close()
+
+    def manage_memory(self, command):
+        async def run():
+            try:
+                if command['action'] == 'search':
+                    await self.store.search_hybrid(command.get('query', ''), 20)
+                self.memory_result.emit(self.store.ledger.control(command))
+            except Exception:
+                self.memory_error.emit('记忆操作未确认，请检查输入并刷新。')
+        asyncio.run_coroutine_threadsafe(run(), self.loop)
 
     async def _approve(self, name, args, description):
         import json

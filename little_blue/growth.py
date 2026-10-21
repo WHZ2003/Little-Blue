@@ -128,12 +128,15 @@ class GrowthMemory:
             state = self._state()
             if not state['enabled'] or now - state['attempted'] < 21600:
                 return None
-            fresh = self.store.db.execute('SELECT count(*), max(origin=?) FROM growth_sources WHERE memory_id>?',
+            fresh = self.store.db.execute('SELECT count(*), max(origin=?) FROM growth_sources g '
+                'LEFT JOIN memory_meta x ON x.memory_id=g.memory_id '
+                "WHERE g.memory_id>? AND coalesce(x.status,'active')='active'",
                 ('explicit_preference', state['cursor'])).fetchone()
             if fresh[0] < 3 and not fresh[1]:
                 return None
             rows = [dict(r) for r in self.store.db.execute(
-                'SELECT * FROM growth_sources ORDER BY memory_id DESC LIMIT 12')]
+                'SELECT g.* FROM growth_sources g LEFT JOIN memory_meta x ON x.memory_id=g.memory_id '
+                "WHERE coalesce(x.status,'active')='active' ORDER BY g.memory_id DESC LIMIT 12")]
             for row in rows:
                 row['text'] = row['text'][:500]
             self.store.db.execute('UPDATE growth_state SET attempted=? WHERE id=1', (now,))
@@ -166,6 +169,12 @@ class GrowthMemory:
             state = self._state()
             if not state['enabled'] or state['generation'] != ticket['generation'] or state['revision'] != ticket['revision']:
                 return False
+            for change in accepted:
+                for evidence in change['evidence']:
+                    row = self.store.db.execute('SELECT status FROM memory_meta WHERE memory_id=?',
+                                               (evidence['source_id'],)).fetchone()
+                    if row and row['status'] != 'active':
+                        return False
             profile = dict(state['profile'])
             profile.update({c['key']: c['value'] for c in accepted})
             revision = state['revision'] + bool(accepted)

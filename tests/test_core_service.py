@@ -58,6 +58,25 @@ async def test_identity_control_requires_host_and_rejects_core_edits(api):
     response, card = await rpc(client, 'identity', identity_action='off')
     assert response.status == 200 and not card['enabled']
     assert (await rpc(client, 'identity', identity_action='rename'))[0].status == 400
+
+
+async def test_memory_management_auth_revision_evidence_and_undo(api):
+    client, core = api
+    assert (await rpc(client, 'memory_manage', memory_command={'action':'view'}))[0].status == 403
+    await claim(client)
+    response, state = await rpc(client, 'memory_manage', memory_command={'action':'view'})
+    assert response.status == 200 and state['revision'] == 0
+    command = dict(action='revise', revision=0, key='user.作业1.状态', text='已经交了', reason='用户更正')
+    response, changed = await rpc(client, 'memory_manage', memory_command=command)
+    assert response.status == 200 and changed['rows'][0]['change']['actor'] == 'user'
+    assert (await rpc(client, 'memory_manage', memory_command=command))[0].status == 400
+    response, result = await rpc(client, 'memory_manage', memory_command={'action':'search','query':'已经交了'})
+    assert response.status == 200 and result['recall']['candidates'][0]['selected']
+    response, undone = await rpc(client, 'memory_manage', memory_command={'action':'undo','revision':1})
+    assert response.status == 200 and undone['rows'][0]['memory']['status'] == 'retracted'
+    assert len(undone['rows']) == 1
+    assert (await rpc(client, 'memory_manage', memory_command={'action':'delete'}))[0].status == 400
+    assert (await rpc(client, 'memory_manage', memory_command={'action':'view','sql':'DROP TABLE memories'}))[0].status == 400
     assert (await rpc(client, 'identity', identity_action='undo', revision=0))[0].status == 400
 
 

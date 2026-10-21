@@ -110,7 +110,7 @@ async def test_split_messages_one_reply_individual_receipts(core):
 
 
 @pytest.mark.parametrize('second_answer', [NO_REPLY, '对，也可以在桌面里关掉。'])
-async def test_second_fragment_received_during_first_answer_sees_delivered_reply(core, second_answer):
+async def test_second_fragment_after_delivery_sees_delivered_reply(core, second_answer):
     calls = dialogue_client(core, [])
     entered, release = asyncio.Event(), asyncio.Event()
     first_answer = '可以主动发消息，设置里有主动交流开关。'
@@ -131,9 +131,9 @@ async def test_second_fragment_received_during_first_answer_sees_delivered_reply
     try:
         api.updates.put_nowait({'msgs': [inbound(1, '能主动发消息吗')]})
         await asyncio.wait_for(entered.wait(), 2)
-        api.updates.put_nowait({'msgs': [inbound(2, '是没配置吗')]})
-        await until(lambda: len(core.store.continuity.recent()) == 2)
         release.set()
+        await until(lambda: len(api.sent) == 1 and not channel.processing)
+        api.updates.put_nowait({'msgs': [inbound(2, '是没配置吗')]})
         await until(lambda: len(calls) == 2 and core.current is None and not channel.processing)
         rows = core.store.continuity.recent()
         assert [r['text'] for r in rows if r['role'] == 'user'] == ['能主动发消息吗', '是没配置吗']
@@ -168,6 +168,79 @@ async def test_failed_delivery_not_treated_as_previous_reply(core):
         assert not any(m['role'] == 'assistant' and m['content'] == '这条没有送达' for m in calls[1])
         assert [r['delivery'] for r in core.store.continuity.recent() if r['role'] == 'assistant'] == ['failed', 'delivered']
     finally:
+        await stop(task)
+
+
+async def test_late_fragment_replaces_unsent_draft_once(core):
+    dialogue_client(core, [])
+    entered, release = asyncio.Event(), asyncio.Event()
+    calls = []
+    class Client:
+        async def complete(self, messages, schemas):
+            calls.append(messages)
+            if len(calls) == 1:
+                entered.set()
+                await release.wait()
+                return {'content': 'UNSENT DRAFT'}
+            assert messages[-1]['content'] == '论文的那个部分\n我说的是结论'
+            assert not any('UNSENT DRAFT' in m['content'] for m in messages)
+            return {'content': '哦，结论那段。'}
+    core.agent.client = Client()
+    api = FakeAPI()
+    channel = WeChatChannel(core, account(), api)
+    task = asyncio.create_task(channel.run())
+    try:
+        api.updates.put_nowait({'msgs': [inbound(1, '论文的那个部分')]})
+        await asyncio.wait_for(entered.wait(), 2)
+        api.updates.put_nowait({'msgs': [inbound(2, '我说的是结论', context_token='new-context')]})
+        await until(lambda: not channel.queue.empty())
+        release.set()
+        await until(lambda: len(api.sent) == 1 and not channel.processing)
+        assert api.sent == [('new-context', '哦，结论那段。')]
+        assert len(calls) == 2
+        assert not core.store.search('UNSENT DRAFT')
+        assert not any('UNSENT' in r['text'] for r in core.store.continuity.snapshot()['messages'])
+        assert [r[0] for r in core.store.db.execute('SELECT state FROM conversation_inbox')] == ['answered', 'answered']
+    finally:
+        release.set()
+        await stop(task)
+
+
+async def test_late_revisions_bounded_and_new_question_not_lost(core):
+    dialogue_client(core, [])
+    entered = [asyncio.Event() for _ in range(2)]
+    release = [asyncio.Event() for _ in range(2)]
+    calls = []
+    class Client:
+        async def complete(self, messages, schemas):
+            index = len(calls)
+            calls.append(messages)
+            if index < 2:
+                entered[index].set()
+                await release[index].wait()
+            return {'content': f'answer-{index}'}
+    core.agent.client = Client()
+    api = FakeAPI()
+    channel = WeChatChannel(core, account(), api)
+    task = asyncio.create_task(channel.run())
+    try:
+        api.updates.put_nowait({'msgs': [inbound(1, '第一句')]})
+        await asyncio.wait_for(entered[0].wait(), 2)
+        api.updates.put_nowait({'msgs': [inbound(2, '第二句')]})
+        await until(lambda: not channel.queue.empty())
+        release[0].set()
+        await asyncio.wait_for(entered[1].wait(), 2)
+        api.updates.put_nowait({'msgs': [inbound(3, '还有一个新问题？')]})
+        await until(lambda: not channel.queue.empty())
+        release[1].set()
+        await until(lambda: len(api.sent) == 2 and not channel.processing)
+        assert [text for _, text in api.sent] == ['answer-1', 'answer-2']
+        assert calls[-1][-1]['content'] == '还有一个新问题？'
+        assert {'role': 'assistant', 'content': 'answer-1'} in calls[-1]
+        assert not any('还有一个新问题' in m['content'] for m in calls[1])
+    finally:
+        for event in release:
+            event.set()
         await stop(task)
 
 

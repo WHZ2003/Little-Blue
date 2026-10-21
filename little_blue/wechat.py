@@ -130,6 +130,7 @@ class WeChatChannel:
         self.cancel_generation = 0
         self.held = None
         self.processing = False
+        self.accepted_mid = None
 
     def accept(self, message):
         if (not isinstance(message, dict) or message.get('from_user_id') != self.account.owner or
@@ -148,15 +149,19 @@ class WeChatChannel:
         texts = [item.get('text_item', {}).get('text', '') for item in items
                  if isinstance(item, dict) and item.get('type') == 1 and isinstance(item.get('text_item'), dict)]
         text = '\n'.join(t for t in texts if isinstance(t, str)).strip()[:2000]
-        # Mark before execution: a crash must not replay an unfinished message.
-        if not self.core.store.claim_message(self.key, ident):
+        self.accepted_mid = None
+        if text and not text.startswith('/'):
+            self.accepted_mid = self.core.store.continuity.admit(self.key, ident, text)
+            if self.accepted_mid is None:
+                return None
+        elif not self.core.store.claim_message(self.key, ident):
             return None
         self.context, self.context_time = context, time.time()
         self.core.wechat_ready = self.core.wechat_state == 'connected'
         return text, context
 
     async def send(self, context, text):
-        if self.stopping:
+        if self.stopping or self.core.store.get('wechat_transport', 'ilink') != 'ilink':
             return
         self.core.store.audit('wechat_send', 'attempted')
         try:
@@ -174,7 +179,8 @@ class WeChatChannel:
     async def send_meme(self, context, ident, automatic=False, generation=None):
         cancel_generation = self.cancel_generation
         def permitted():
-            return (not self.stopping and cancel_generation == self.cancel_generation and
+            return (not self.stopping and self.core.store.get('wechat_transport', 'ilink') == 'ilink'
+                    and cancel_generation == self.cancel_generation and
                     (not automatic or self.meme_gate.enabled() and
                      generation == self.meme_gate.generation() and not self.core.settings.dnd and not self.core.env.focused))
         if not permitted():
@@ -262,12 +268,24 @@ class WeChatChannel:
                     if accepted is None:
                         continue
                     text, context = accepted
+                    if text in ('/browser', '/browser pause', '/browser auto'):
+                        try:
+                            action = {'/browser': 'status', '/browser pause': 'pause', '/browser auto': 'auto'}[text]
+                            state = await self.core.browser.control(action)
+                            label = {'auto': '自主浏览', 'pause': '已暂停', 'manual': '由你接管'}[state['mode']]
+                            await self.send(context, f"独立浏览器：{label}。\n{state.get('title', '')}\n"
+                                '电脑上右键桌宠 → 她的浏览器，可查看和接管。')
+                        except Exception:
+                            await self.send(context, '独立浏览器暂时连不上；聊天不受影响。')
+                        continue
                     if text in ('/context', '/followup on', '/followup off', '关闭跟进', '开启跟进', '不要再问进度了'):
                         continuity = self.core.store.continuity
-                        mid = continuity.append('user', text, 'wechat')
+                        mid = self.accepted_mid or continuity.append('user', text, 'wechat')
                         reply = continuity.observe(text, 'wechat', mid)
-                        continuity.append('assistant', reply, 'wechat')
-                        await self.send(context, reply)
+                        reply_id = continuity.append('assistant', reply, 'wechat', delivery='pending')
+                        delivered = await self.send(context, reply)
+                        continuity.delivered(reply_id, delivered)
+                        continuity.inbox_state([mid], 'answered' if delivered else 'failed')
                         continue
                     if await self.identity_command(text, context):
                         continue
@@ -277,6 +295,7 @@ class WeChatChannel:
                         continue
                     if text == '/cancel':
                         self.cancel_generation += 1
+                        self.core.store.continuity.cancel_inbox()
                         self.held = None
                         if self.image_job and not self.image_job.done():
                             self.image_job.cancel()
@@ -286,9 +305,10 @@ class WeChatChannel:
                             await self.core.cancel()
                         await self.send(context, '微信任务已取消；已排队的消息已清空。')
                     elif self.queue.full():
+                        self.core.store.continuity.inbox_state([self.accepted_mid], 'rejected')
                         await self.send(context, '消息有点多，请稍后再发。')
                     else:
-                        mid = self.core.store.continuity.append('user', text, 'wechat') if text and not text.startswith('/') else None
+                        mid = self.accepted_mid
                         self.queue.put_nowait((text, context, mid))
                         self.core.wechat_receiving = True
                 cursor = result.get('get_updates_buf')
@@ -346,10 +366,10 @@ class WeChatChannel:
         mid = self.core.store.continuity.append('user', text, 'wechat') if text and not text.startswith('/') else None
         return text, context, mid
 
-    async def collect(self, first):
+    async def collect(self, first, existing=None):
         """Trailing-edge debounce, bounded by 4s / 6 messages / 2000 characters."""
-        parts = [first]
-        size = len(first[0])
+        parts = list(existing or []) + [first]
+        size = sum(len(p[0]) for p in parts) + len(parts) - 1
         deadline = time.monotonic() + 4
         generation = self.cancel_generation
         while len(parts) < 6:
@@ -385,7 +405,10 @@ class WeChatChannel:
     async def consume_one(self, item):
         text, context, mid = item
         generation = self.cancel_generation
-        if text.split()[:1] == ['/meme']:
+        if text in ('/sharing on', '/sharing off'):
+            self.core.store.put('browser_sharing_enabled', text.endswith(' on'))
+            await self.send(context, '好，看到有趣的再分享给你。' if text.endswith(' on') else '好，逛网页的事先留给我自己。')
+        elif text.split()[:1] == ['/meme']:
             words = text.split()
             if len(words) == 2 and words[1] in self.memes.items:
                 await self.send_meme(context, words[1])
@@ -416,19 +439,59 @@ class WeChatChannel:
                     while self.core.current and generation == self.cancel_generation:
                         await asyncio.sleep(.05)
             except TimeoutError:
+                self.core.store.continuity.inbox_state([p[2] for p in parts], 'failed')
                 await self.send(context, '消息已保存，但前一个任务一直未结束。请稍后再找我，或取消当前任务。')
                 return
             if generation != self.cancel_generation:
                 return
-            self.core.emit('wechat_incoming', text=text)
-            ids = [p[2] for p in parts if p[2] is not None]
-            task_id = self.core.submit(text, origin='wechat', received_ids=ids or None)
-            answer = await asyncio.shield(self.core.job)
-            result = next((e for e in reversed(self.core.events) if e.get('id') == task_id and e['kind'] == 'result'), {})
-            if generation != self.cancel_generation or result.get('silent') or not answer:
+            # Fold one late batch into an unsent draft, never replay a sent reply.
+            # One revision caps paid work and prevents starvation during long bursts.
+            for revision in range(2):
+                text = '\n'.join(p[0] for p in parts)
+                context = parts[-1][1]
+                ids = [p[2] for p in parts if p[2] is not None]
+                # A desktop task may have started during the late-batch wait.
+                try:
+                    async with asyncio.timeout(245):
+                        while self.core.current and generation == self.cancel_generation:
+                            await asyncio.sleep(.05)
+                except TimeoutError:
+                    self.core.store.continuity.inbox_state(ids, 'failed')
+                    await self.send(context, '消息已保存，但前一个任务还没结束。可以稍后再聊。')
+                    return
+                if generation != self.cancel_generation:
+                    return
+                self.core.store.continuity.inbox_state(ids, 'processing')
+                self.core.emit('wechat_incoming', text=text)
+                task_id = self.core.submit(text, origin='wechat', received_ids=ids or None)
+                answer = await asyncio.shield(self.core.job)
+                result = next((e for e in reversed(self.core.events) if e.get('id') == task_id and e['kind'] == 'result'), {})
+                if generation != self.cancel_generation:
+                    self.core.store.continuity.supersede(result.get('message_id'))
+                    return
+                late = None
+                if revision == 0 and result.get('ok') and len(parts) < 6 and not text.startswith('/'):
+                    late = self.held
+                    self.held = None
+                    if late is None and not self.queue.empty():
+                        late = self.normalize(self.queue.get_nowait())
+                    if late and (not late[0] or late[0].startswith('/') or len(text) + 1 + len(late[0]) > 2000):
+                        self.held, late = late, None
+                if late:
+                    self.core.store.continuity.supersede(result.get('message_id'))
+                    parts = await self.collect(late, existing=parts)
+                    if generation != self.cancel_generation:
+                        return
+                    continue
+                break
+            if result.get('silent') or not answer:
+                self.core.store.continuity.inbox_state(ids, 'silent' if result.get('ok') else 'failed')
                 return
             delivered = await self.send(context, answer)
             self.core.store.continuity.delivered(result.get('message_id'), delivered)
+            self.core.store.continuity.inbox_state(ids, 'answered' if delivered and result.get('ok') else 'failed')
+            if delivered and result.get('ok'):
+                self.core.store.remember_dialogue(text, answer)
             if delivered and result.get('ok') and result.get('meme_id'):
                 await self.send_meme(context, result['meme_id'], True, result.get('meme_generation'))
 
@@ -439,37 +502,57 @@ class WeChatChannel:
         events = [e for e in self.core.events if e['seq'] > self.last_event]
         self.last_event = self.core.sequence
         for event in events:
-            if (event['kind'] == 'reminder' or
+            if (event['kind'] in ('reminder', 'browser_share') or
                     event['kind'] == 'followup' and event.get('origin') == 'wechat' or
                     event['kind'] == 'result' and event.get('proactive') and event.get('ok') and not event.get('silent')):
                 self.notifications.append((event.get('started', event.get('created', now)), event['text'], event.get('meme_id'), event.get('meme_generation'),
                                            event.get('source_id') if event['kind'] == 'followup' else None,
-                                           event['kind'], event.get('message_id')))
+                                           event['kind'], event.get('message_id'),
+                                           bool(event['kind']=='browser_share' and event.get('requested')),
+                                           event.get('request_id')))
         self.sent = deque((t for t in self.sent if now - t < 3600), maxlen=20)
         # Deferred notifications expire locally; no surprise catch-up after restarting.
         # A delayed follow-up becomes stale when the activity changes or is disabled.
         activity = self.core.store.get('current_activity')
         retained = deque(maxlen=20)
         for n in self.notifications:
-            stale = (now - n[0] > 3600 or n[5] == 'result' and n[0] < self.context_time or
+            stale = (now - n[0] > 3600 or n[5] in ('result', 'browser_share') and
+                     n[0] < max(self.context_time, self.core.store.get('last_user_at', 0)) or
+                     n[5] == 'browser_share' and not self.core.store.get('browser_sharing_enabled', True) or
                      n[4] is not None and not (self.core.store.get('activity_followups', True) and activity
                      and activity['status'] == 'active' and activity['source_id'] == n[4]))
             if stale:
                 self.core.store.continuity.delivered(n[6], False)
+                if n[8]:
+                    self.core.store.task(n[8], 'cancelled', '分享已过时或被关闭，没有发送')
             else:
                 retained.append(n)
         self.notifications = retained
+        # Explicit user requests take precedence over unsolicited notifications.
+        self.notifications = deque(sorted(self.notifications, key=lambda n: not n[7]), maxlen=20)
+        requested = bool(self.notifications and self.notifications[0][7])
         if (not self.notifications or not self.core.wechat_ready or s.dnd or
-                self.core.env.focused or not s.proactive or len(self.sent) >= s.proactive_per_hour or
-                self.sent and now - self.sent[-1] < s.proactive_cooldown):
+                self.core.env.focused or not s.proactive or
+                not requested and (len(self.sent) >= s.proactive_per_hour or
+                self.sent and now - self.sent[-1] < s.proactive_cooldown)):
             return
-        if self.notifications[0][5] != 'reminder' and (self.core.wechat_receiving or self.core.current or now - self.context_time < 90):
+        if self.notifications[0][5] != 'reminder' and (self.core.wechat_receiving or self.core.current or not requested and now - self.context_time < 90):
+            return
+        # Recheck social timing at the actual send boundary, including desktop
+        # input that arrived after generation. Explicit reminders/requests remain usable.
+        from .conversation_scene import scene
+        if not requested and self.notifications[0][5] != 'reminder' and scene(self.core.store, now)['defer_unsolicited']:
             return
         self.sent.append(now)
         self.core.store.put(self.key + ':sent', list(self.sent))
-        _, text, meme_id, generation, _, _, mid = self.notifications.popleft()
+        _, text, meme_id, generation, _, kind, mid, _, request_id = self.notifications.popleft()
         delivered = await self.send(self.context, text)
         self.core.store.continuity.delivered(mid, delivered)
+        if delivered and kind == 'browser_share':
+            self.core.store.remember('已向用户分享实际浏览的网页：' + text)
+        if request_id:
+            self.core.store.task(request_id, 'succeeded' if delivered else 'failed',
+                                 'iLink 已接受网页分享消息' if delivered else '发送未确认，不自动重试')
         if delivered and meme_id:
             await self.send_meme(self.context, meme_id, True, generation)
 
@@ -497,6 +580,7 @@ class WeChatChannel:
             await asyncio.gather(*tasks, return_exceptions=True)
             if self.core.current and self.core.current.get('origin') == 'wechat':
                 await self.core.cancel()
+            self.core.store.continuity.interrupt_inbox()
             await self.api.close()
 
 
@@ -524,6 +608,13 @@ async def supervise(core, path):
     try:
         while True:
             try:
+                if core.store.get('wechat_transport', 'ilink') != 'ilink':
+                    if job:
+                        job.cancel()
+                        await asyncio.gather(job, return_exceptions=True)
+                    current, job, core.ilink_job = None, None, None
+                    await asyncio.sleep(1)
+                    continue
                 account = read_account(path)
                 if account != current:
                     if job:
@@ -532,6 +623,7 @@ async def supervise(core, path):
                     current, job = account, None
                     if account and account.enabled:
                         job = asyncio.create_task(WeChatChannel(core, account).run())
+                        core.ilink_job = job
                     else:
                         core.wechat_state = 'disabled' if account else 'unbound'
                 if job and job.done():

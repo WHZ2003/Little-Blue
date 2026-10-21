@@ -14,12 +14,15 @@ services:
       LITTLE_BLUE_DATA_DIR: /data
       TZ: America/New_York
       LITTLE_BLUE_EMBEDDING_MODEL_DIR: /models/bge-small-zh-v1.5
+      LITTLE_BLUE_BROWSER_URL: http://browser:8080
     volumes:
       - core-data:/data
       - ./assets/memes:/app/assets/memes:ro
       - ./models:/models:ro
     secrets:
       - core_token
+      - browser_token
+      - bridge_token
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
@@ -36,8 +39,42 @@ services:
       options:
         max-size: "5m"
         max-file: "3"
+  browser:
+    build: ./browser_service
+    image: little-blue-browser:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8766:8080"
+    volumes:
+      - browser-data:/browser
+    secrets:
+      - browser_token
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    shm_size: 256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./browser_service/seccomp_profile.json
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.0
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
 volumes:
   core-data:
+  browser-data:
 secrets:
   core_token:
     file: ./.secrets/core_token
+  browser_token:
+    file: ./.secrets/browser_token
+  bridge_token:
+    file: ./.secrets/bridge_token

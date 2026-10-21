@@ -14,6 +14,7 @@ from .perception import perceive
 from .sprites import SpriteBank
 from .worker import Worker
 from .identity_ui import IdentityDialog
+from .memory_ui import MemoryDialog
 from .chat_ui import ChatBubble
 from .phone import Phone
 from .phone_ui import PhoneDialog
@@ -52,7 +53,9 @@ class PetWindow(QWidget):
     chat_requested = Signal()
     open_panel = Signal()
     open_identity = Signal()
+    open_memory = Signal()
     open_phone = Signal()
+    open_browser = Signal()
     quit_requested = Signal()
 
     def __init__(self, life, settings, sprites):
@@ -95,13 +98,25 @@ class PetWindow(QWidget):
         action = self.life.action
         if now < self.talk_until and action not in (Action.DRAG, Action.SLEEP):
             action = Action.TALK
+        # The body and renderer must use the same action: a talking/standing
+        # sprite must not continue translating with a hidden walking command.
+        old_x = self.body.x
+        if not self.dragging and self.press is None and not self.chat_open:
+            target = QCursor.pos().x() - self.width() / 2 if self.settings.follow_mouse and self.settings.perception and not self.settings.dnd and not self.life.phone_active and action != Action.TALK else None
+            self.life.direction = self.body.tick(dt, action, self.bounds(), self.width(), self.life.direction, target)
+            self.move(round(self.body.x), round(self.body.y))
+        distance = abs(self.body.x - old_x)
+        if self.dragging:
+            action = Action.DRAG
+        elif action in (Action.WALK, Action.RUN) and (self.chat_open or self.press is not None):
+            action = Action.IDLE
+        elif action == Action.IDLE and distance > 0:
+            action = Action.WALK  # Mouse-follow movement needs an actual gait.
         if action != self.anim_action:
             self.anim_action, self.anim_elapsed = action, 0
-        self.anim_elapsed += dt
-        if not self.dragging and self.press is None and not self.chat_open:
-            target = QCursor.pos().x() - self.width() / 2 if self.settings.follow_mouse and self.settings.perception and not self.settings.dnd and not self.life.phone_active else None
-            self.life.direction = self.body.tick(dt, self.life.action, self.bounds(), self.width(), self.life.direction, target)
-            self.move(round(self.body.x), round(self.body.y))
+        # Clamp/boundary pauses cannot keep feet walking in place. Advance the
+        # gait from actual local distance; all other clips remain time-driven.
+        self.anim_elapsed += distance / (130 if action == Action.RUN else 48) if action in (Action.WALK, Action.RUN) else dt
         self.update()
 
     def paintEvent(self, event):
@@ -156,8 +171,10 @@ class PetWindow(QWidget):
         menu = QMenu(self)
         menu.addAction("聊聊天", self.chat_requested.emit)
         menu.addAction("她的手机…", self.open_phone.emit)
+        menu.addAction("她的浏览器…", self.open_browser.emit)
         menu.addAction("查看状态", self.status_requested.emit)
         menu.addAction("身份与成长…", self.open_identity.emit)
+        menu.addAction("记忆与依据…", self.open_memory.emit)
         menu.addAction("DeepSeek控制台", self.open_panel.emit)
         menu.addAction("摸摸头", lambda: self.interaction.emit("pet"))
         menu.addAction("跳一跳", lambda: self.interaction.emit("click"))
@@ -426,7 +443,7 @@ class Panel(QWidget):
         model.editingFinished.connect(lambda: self.c.setting("model", model.text().strip() or "deepseek-flash"))
         form.addRow("DeepSeek 模型", model)
         for key, label, low, high in [("daily_requests", "每日请求上限", 0, 1000),
-                                     ("daily_tokens", "每日 Token 预算（含未结算预留）", 0, 1000000),
+                                     ("daily_tokens", "每日 Token 预算（含未结算预留）", 0, 2000000),
                                      ("proactive_cooldown", "主动交流间隔 / 秒", 60, 86400)]:
             spin = QSpinBox()
             spin.setRange(low, high)
@@ -528,11 +545,18 @@ class Controller:
         self.chat_bubble = ChatBubble(self)
         self.phone_dialog = PhoneDialog(self)
         self.pet.open_phone.connect(self.show_phone)
+        self.pet.open_browser.connect(self.show_browser)
         self.pet.chat_requested.connect(self.chat_bubble.toggle)
         self.pet.interaction.connect(lambda kind: self.chat_bubble.hide() if kind == 'drag' else None)
         self.identity_dialog = IdentityDialog(self)
         self.identity_dialog.setStyleSheet(STYLE)
         self.pet.open_identity.connect(self.show_identity)
+        self.memory_dialog = MemoryDialog(self)
+        self.memory_dialog.setStyleSheet(STYLE)
+        self.pet.open_memory.connect(self.show_memory)
+        if hasattr(self.worker, 'memory_result'):
+            self.worker.memory_result.connect(self.memory_dialog.render)
+            self.worker.memory_error.connect(self.memory_dialog.failed)
         self.pet.status_requested.connect(self.status_bubble.toggle)
         self.pet.interaction.connect(lambda kind: self.status_bubble.hide() if kind == "drag" else None)
         self.pet.interaction.connect(self.interact)
@@ -552,8 +576,10 @@ class Controller:
         menu = QMenu()
         menu.addAction("聊聊天", self.chat_bubble.toggle)
         menu.addAction("她的手机…", self.show_phone)
+        menu.addAction("她的浏览器…", self.show_browser)
         menu.addAction("打开控制台", self.show_panel)
         menu.addAction("身份与成长…", self.show_identity)
+        menu.addAction("记忆与依据…", self.show_memory)
         menu.addAction("找回DeepSeek", self.pet.reset_position)
         menu.addAction("保存并退出", self.quit)
         self.tray.setContextMenu(menu)
@@ -569,6 +595,14 @@ class Controller:
         except Exception:
             LOG.warning("Invalid saved %s; restoring defaults", key)
             return model()
+
+    def show_memory(self):
+        self.chat_bubble.hide()
+        self.status_bubble.hide()
+        self.memory_dialog.show()
+        self.memory_dialog.raise_()
+        self.memory_dialog.activateWindow()
+        self.memory_dialog.request('view')
 
     def show_identity(self):
         self.chat_bubble.hide()
@@ -587,6 +621,12 @@ class Controller:
         self.phone_dialog.activateWindow()
         if hasattr(self.worker, 'environment'):
             self.worker.environment['phone_open'] = True
+
+    def show_browser(self):
+        if hasattr(self.worker, 'browser_view'):
+            self.worker.browser_view()
+        else:
+            self.show_feedback('独立浏览器需要 Docker 核心模式；请先运行 start-core.ps1。')
 
     def phone_state(self):
         return self.phone.snapshot() if self.phone else getattr(self.store, 'state', {}).get('phone')
@@ -787,5 +827,6 @@ class Controller:
         self.pet.hide()
         self.panel.hide()
         self.identity_dialog.hide()
+        self.memory_dialog.hide()
         self.store.close()
         self.app.quit()

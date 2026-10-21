@@ -76,7 +76,7 @@ class Settings(Model):
     size: int = Field(180, ge=96, le=400)
     fps: int = Field(60, ge=30, le=60)
     daily_requests: int = Field(60, ge=0, le=1000)
-    daily_tokens: int = Field(60000, ge=0, le=1000000)
+    daily_tokens: int = Field(2000000, ge=0, le=2000000)
     proactive_cooldown: int = Field(900, ge=60, le=86400)
     proactive_per_hour: int = Field(3, ge=0, le=12)
     personality: Personality = Field(default_factory=Personality)

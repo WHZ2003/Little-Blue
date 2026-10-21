@@ -21,7 +21,7 @@ def app():
 def test_sprite_all_actions_and_animation_frames(app):
     bank = SpriteBank(Path(__file__).parents[1] / 'assets/blue/manifest.json')
     for action in Action:
-        assert len(bank.clips[action].frames) == 4
+        assert len(bank.clips[action].frames) == (8 if action == Action.WALK else 4)
         assert not bank.frame(action, .2).isNull()
     assert bank.frame(Action.IDLE, 0).cacheKey() != bank.frame(Action.IDLE, .5).cacheKey()
 
@@ -59,6 +59,72 @@ def test_atlas_rectangles_validate_bounds_and_slice(app, tmp_path):
         manifest(rects)
         with pytest.raises(ValueError):
             SpriteBank(path)
+
+
+def test_clip_can_use_separate_atlas_without_changing_other_actions(app, tmp_path):
+    import json
+    from PySide6.QtGui import QColor, QPixmap
+    for name, color in [('idle', 'blue'), ('walk', 'red')]:
+        image = QPixmap(20, 20)
+        image.fill(QColor(color))
+        image.save(str(tmp_path / (name + '.png')))
+    path = tmp_path / 'manifest.json'
+    data = {'sheet': 'idle.png', 'animations': {
+        'idle': {'rects': [[0, 0, 20, 20]]},
+        'walk': {'sheet': 'walk.png', 'rects': [[0, 0, 20, 20]]},
+        'talk': {'rects': [[0, 0, 20, 20]]}}}
+    path.write_text(json.dumps(data))
+    bank = SpriteBank(path)
+    for action, color in [('idle', 'blue'), ('walk', 'red'), ('talk', 'blue')]:
+        assert bank.frame(action, 0).toImage().pixelColor(0, 0) == QColor(color)
+    data['animations']['walk']['sheet'] = '../outside.png'
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match='清单目录'):
+        SpriteBank(path)
+
+
+def test_walk_motion_matches_rendered_action_and_keeps_phase(app, monkeypatch):
+    from types import SimpleNamespace
+    from little_blue.life import Life
+    from little_blue.models import Settings
+    from little_blue.ui import PetWindow
+    pet = PetWindow(Life(), Settings(), SpriteBank(Path(__file__).parents[1] / 'assets/blue/manifest.json'))
+    pet.timer.stop()
+    clock = [100.]
+    monkeypatch.setattr('little_blue.ui.time', SimpleNamespace(monotonic=lambda: clock[0]))
+    pet.bounds = lambda: (0, 0, 1000, 1000)
+    pet.body.x, pet.body.y = 400, 820
+    pet.last = clock[0]
+    pet.life.override, pet.life.override_until = Action.WALK, float('inf')
+    pet.life.direction = 1
+    def step():
+        clock[0] += .02
+        pet.frame()
+    try:
+        for _ in range(50): step()
+        assert pet.body.x == pytest.approx(448)
+        assert pet.anim_action == Action.WALK
+        assert pet.anim_elapsed == pytest.approx(1)
+        elapsed = pet.anim_elapsed
+        pet.life.direction = -1
+        step()
+        assert pet.anim_elapsed > elapsed  # Turning does not reset the stride.
+        pet.talk_until = clock[0] + 1
+        x = pet.body.x
+        step()
+        assert pet.anim_action == Action.TALK and pet.body.x == x
+        pet.talk_until = 0
+        pet.chat_open = True
+        step()
+        assert pet.anim_action == Action.IDLE and pet.body.x == x
+        pet.chat_open = False
+        pet.life.override = Action.IDLE
+        pet.settings.follow_mouse = pet.settings.perception = True
+        monkeypatch.setattr('little_blue.ui.QCursor', SimpleNamespace(pos=lambda: QPoint(900, 900)))
+        step()
+        assert pet.body.x > x and pet.anim_action == Action.WALK
+    finally:
+        pet.close()
 
 
 def test_network_pending_does_not_block_life_or_frames(app, tmp_path):

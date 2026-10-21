@@ -55,6 +55,8 @@ class Store:
         self.growth = GrowthMemory(self)
         from .continuity import Continuity
         self.continuity = Continuity(self)
+        from .memory_ledger import MemoryLedger
+        self.ledger = MemoryLedger(self)
 
     @staticmethod
     def now():
@@ -99,8 +101,8 @@ class Store:
         if learn:
             self.growth.source(memory_id, text, 'user_dialogue')
 
-    def search(self, query, limit=8):
-        limit = max(1, min(limit, 30))
+    def search_candidates(self, query, limit=8):
+        limit = max(1, min(limit, 60))
         terms = re.findall(r"\w+", str(query))[:12]
         with self.lock:
             if terms:
@@ -112,6 +114,10 @@ class Store:
             else:
                 rows = self.db.execute("SELECT * FROM memories ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
+
+    def search(self, query, limit=8):
+        limit = max(1, min(limit, 30))
+        return self.ledger.rank(self.search_candidates(query, min(60, limit * 3)), str(query), limit)
 
     async def search_hybrid(self, query, limit=8):
         if self.retriever is not None:
@@ -133,7 +139,9 @@ class Store:
 
     def semantic(self, limit=8):
         with self.lock:
-            return [dict(r) for r in self.db.execute("SELECT * FROM memories WHERE kind='semantic' ORDER BY id DESC LIMIT ?", (min(limit, 20),))]
+            rows = [dict(r) for r in self.db.execute("SELECT m.* FROM memories m LEFT JOIN memory_meta x ON x.memory_id=m.id "
+                "WHERE m.kind='semantic' AND coalesce(x.status,'active')='active' ORDER BY m.id DESC LIMIT ?", (min(limit, 20),))]
+            return [{**r, 'memory': self.ledger.meta(r)} for r in rows]
 
     def budget_usage(self):
         day = datetime.now().astimezone().date().isoformat()
