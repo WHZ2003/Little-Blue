@@ -1,0 +1,9 @@
+# Allowlist: credentials, local data, art and research never enter the context.
+**
+!Dockerfile
+!pyproject.toml
+!requirements-core.txt
+!little_blue/
+!little_blue/**
+little_blue/**/__pycache__/
+little_blue/**/*.pyc

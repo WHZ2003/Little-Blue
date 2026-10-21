@@ -1,0 +1,19 @@
+{
+  "name": "DeepSeek · 蓝发鲸鱼女仆",
+  "source": "Built-in image_gen; Image1-based style approved by user on 2026-10-20; not an official DeepSeek asset",
+  "sheet": "atlas-v3.png",
+  "columns": 4,
+  "rows": 9,
+  "row_edges": [0, 245, 454, 654, 882, 1051, 1277, 1500, 1716, 1881],
+  "animations": {
+    "idle": {"row": 0, "fps": 3},
+    "walk": {"row": 1, "fps": 8},
+    "run": {"rects": [[0,454,200,206], [200,454,209,200], [409,454,218,200], [627,454,209,200]], "fps": 12},
+    "jump": {"rects": [[0,660,220,222], [220,654,198,228], [418,654,209,228], [627,654,209,228]], "fps": 4, "loop": false},
+    "sleep": {"row": 4, "fps": 2},
+    "happy": {"row": 5, "fps": 5},
+    "angry": {"row": 6, "fps": 3},
+    "talk": {"row": 7, "fps": 6},
+    "drag": {"row": 8, "fps": 4}
+  }
+}

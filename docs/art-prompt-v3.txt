@@ -1,0 +1,16 @@
+Use the attached character reference as the ONLY appearance reference. Create a production sprite animation atlas of this SAME blue-haired whale maid in her illustrated anime proportions. Match the reference silhouette closely: approximately 4.5 to 5 heads tall, modest head size, slender arms, long visible lower legs, knee-length full navy skirt. NOT chibi, NOT super-deformed, NOT a huge head on a tiny body. Preserve her long flowing blue hair with lighter cyan ends, blue eyes, ahoge, small whale-fin ears, white ruffled maid headband, dark navy long sleeves and neck bow, white ruffled bib, gold buttons at waist, white apron with tiny blue whale motif, fine gold embroidery along navy skirt hem, white lace petticoat, white frilly ankle socks, navy Mary Jane shoes, large blue whale tail curving behind skirt. Delicate clean anime line art and soft painted shading like the supplied reference. No human hands holding her.
+
+OUTPUT: one transparent PNG atlas with EXACTLY FOUR columns and NINE rows, 36 individual complete full-body sprites. Tall aspect ratio 4:9, ideally 1536x3456. Each of the 36 cells is exactly the same SQUARE size. Place each whole character centered within its cell, with at least 12% fully transparent padding at every edge; hair, shoes, ahoge, and tail must fit fully inside the cell. Absolutely no overlap between cells. Standing characters all use identical head/body scale and foot baseline at 88% cell height; height from ahoge to shoe is 76% cell height. Sleeping poses retain same anatomical proportions, only change posture. Clean transparent gutters at every row and column boundary. Actual alpha transparency, no white backdrop, no checkerboard painted into image, no labels, numbers, text, borders or dividers.
+
+Row order TOP to BOTTOM, exactly four frames per row:
+1 IDLE front three-quarter standing: open eyes, blink halfway, eyes closed, open eyes with hair settling; arms relaxed.
+2 WALK facing right: four distinct successive phases of a walking stride, alternating feet and arms, flowing skirt.
+3 RUN facing right: four distinct successive running phases with longer stride, bent arms and hair trailing.
+4 JUMP: slight anticipation crouch, upward leap, airborne apex with bent knees, landing with slight bent knees.
+5 SLEEP: seated asleep on folded skirt, knees tucked; four subtle breathing phases with closed eyes.
+6 HAPPY: four successive cheerful waving poses, smile and eyes soften.
+7 ANGRY: mildly pouty with crossed arms; four subtle expression and head motion phases, not aggressive.
+8 TALK: standing with small hand gestures, mouth closed, slightly open, open, closed, consistent body position.
+9 DRAG: surprised dangling pose with legs hanging down and feet moving gently; arms out for balance, no outside hands or objects.
+
+Prioritize faithful reference body proportions over oversized faces. Every figure must be intact and separated by generous transparent gutters.

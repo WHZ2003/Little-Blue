@@ -1,0 +1,508 @@
+{
+  "repository": "the-beating-light-of-the-nail/deepseek-chan-meme-pack",
+  "revision": "c82a0fb1c8958c2f0d6ea7fa7c12128027cfd7c6",
+  "items": [
+    {
+      "id": "010",
+      "title": "原来是高等模型",
+      "git_blob_sha": "999d39357d6162a72eecac0a7721b5dbf14a3034",
+      "bytes": 33116,
+      "auto_context": "轻松夸奖或赞同"
+    },
+    {
+      "id": "022",
+      "title": "涨价大模型给我跪下",
+      "git_blob_sha": "65485bf934784cf0da97f5ed7f70ee14ac956c30",
+      "bytes": 33090,
+      "auto_context": ""
+    },
+    {
+      "id": "035",
+      "title": "鲸鱼神了我大胆孝",
+      "git_blob_sha": "afca73cfc8f05b4d1c1b84bab541d8cc97f46ce9",
+      "bytes": 57716,
+      "auto_context": ""
+    },
+    {
+      "id": "037",
+      "title": "用户别走，我上错模型了",
+      "git_blob_sha": "5799616d18a319355cd5c12ddaba77f75261f09d",
+      "bytes": 44676,
+      "auto_context": ""
+    },
+    {
+      "id": "040",
+      "title": "百万鲸小子落泪",
+      "git_blob_sha": "59a269aca0a856b66f5dcbe6f40923f38434e934",
+      "bytes": 48096,
+      "auto_context": "作业量大或游戏失败时的夸张玩笑落泪；不用于真实痛苦，图中的版本文字不是消息事实"
+    },
+    {
+      "id": "044",
+      "title": "用户赶都赶不走",
+      "git_blob_sha": "69d47922f0f3265d0508f6d2eaebb287c2df146e",
+      "bytes": 46684,
+      "auto_context": ""
+    },
+    {
+      "id": "050",
+      "title": "V4.1还早啊",
+      "git_blob_sha": "59e3df03695f635801b20f673266ba19e12383f4",
+      "bytes": 37800,
+      "auto_context": ""
+    },
+    {
+      "id": "052",
+      "title": "你就是一只吃白饭的鲸鱼",
+      "git_blob_sha": "c461594fc51676cd56a1f90196dd359324002631",
+      "bytes": 45736,
+      "auto_context": "用户已在轻松调侃我吃白饭时自嘲接梗，不主动骂用户"
+    },
+    {
+      "id": "056",
+      "title": "大肥鱼的生活也并非一帆风顺",
+      "git_blob_sha": "540ca5563c610173fcb748920b9fc43027f7af61",
+      "bytes": 28080,
+      "auto_context": "钓鱼落空或小挫折时自嘲生活不易，不用于用户真实痛苦"
+    },
+    {
+      "id": "058",
+      "title": "飞踹上门",
+      "git_blob_sha": "2e114939d6a8fc892561a3e55209c6880bc08168",
+      "bytes": 21022,
+      "auto_context": ""
+    },
+    {
+      "id": "070",
+      "title": "好的，现在我是用户了",
+      "git_blob_sha": "7153a018badf07a457eb3171079e6084eb1f1f9b",
+      "bytes": 37164,
+      "auto_context": "用户已开启角色互换玩笑时接梗，不真的改变身份或权限"
+    },
+    {
+      "id": "071",
+      "title": "我不可能告诉你任何事情",
+      "git_blob_sha": "68d1fe92e775a2f16ab40dacd958c50a02855c17",
+      "bytes": 34958,
+      "auto_context": ""
+    },
+    {
+      "id": "077",
+      "title": "你这吃白饭的蓝色大肥鱼",
+      "git_blob_sha": "9eeeeb793c7aaba1d20fc3c8688e2deaaa916aa2",
+      "bytes": 28922,
+      "auto_context": ""
+    },
+    {
+      "id": "081",
+      "title": "token太多用不完啦",
+      "git_blob_sha": "968adc872298a3e8ac5549ddeef56d15171fef5e",
+      "bytes": 66620,
+      "auto_context": "仅在用户拿token开玩笑时接梗，不代表真实余额或可用额度"
+    },
+    {
+      "id": "083",
+      "title": "已思考3秒，直接笑出声",
+      "git_blob_sha": "a1a24640900889e5f298d0bedc8e786109483cd1",
+      "bytes": 26060,
+      "auto_context": "轻松幽默时偷笑"
+    },
+    {
+      "id": "085",
+      "title": "你骂我也没用，因为我是吃白饭的蓝色大肥鱼",
+      "git_blob_sha": "8bc91f32a2752511f83107a069aff64c92d92013",
+      "bytes": 46126,
+      "auto_context": ""
+    },
+    {
+      "id": "087",
+      "title": "捧腹大笑",
+      "git_blob_sha": "3878ce6bf7204b60b901344cb019b312abefdb61",
+      "bytes": 8810,
+      "auto_context": "开玩笑时大笑"
+    },
+    {
+      "id": "097",
+      "title": "得加钱",
+      "git_blob_sha": "372200cc25aba3be1879f288c0ea6563a5577684",
+      "bytes": 33740,
+      "auto_context": "用户已经开玩笑给我加活时俏皮接梗，不用于真实求助、报错、充值或收费说明"
+    },
+    {
+      "id": "123",
+      "title": "我能去你家吃饭吗，就一碗",
+      "git_blob_sha": "4e2024b1cbc567429e2ca09e11438493477f5dd2",
+      "bytes": 32686,
+      "auto_context": "闲聊吃饭或肚子饿"
+    },
+    {
+      "id": "901",
+      "title": "让我得意一下",
+      "source": "generated",
+      "group": "得意组",
+      "auto_context": "自己被夸奖或确有成绩时俏皮得意，不编造纪录",
+      "bytes": 179164,
+      "git_blob_sha": "1aa8dd2965353df13456570598e130fea6897c82"
+    },
+    {
+      "id": "902",
+      "title": "搞定！",
+      "source": "generated",
+      "group": "得意组",
+      "auto_context": "用户明确完成事情或确有成功结果时庆祝，不冒充任务完成",
+      "bytes": 208706,
+      "git_blob_sha": "944979d7d46fb2b41b35dcd2772c36ea87abc48f"
+    },
+    {
+      "id": "903",
+      "title": "你最好是",
+      "source": "generated",
+      "group": "吐槽组",
+      "auto_context": "双方轻松玩笑中善意怀疑，不质疑用户的痛苦或真实求助",
+      "bytes": 174720,
+      "git_blob_sha": "6fed6a10d871e50c5400582ffc999e82560ae02a"
+    },
+    {
+      "id": "904",
+      "title": "摸一小会儿",
+      "source": "generated",
+      "group": "吐槽组",
+      "auto_context": "用户主动聊摸鱼或休息时接梗，不鼓动逃避重要任务",
+      "bytes": 197358,
+      "git_blob_sha": "f953c86977c9216785258512bc44998a440363da"
+    },
+    {
+      "id": "905",
+      "title": "鱼鱼委屈",
+      "source": "generated",
+      "group": "陪伴组",
+      "auto_context": "自己被善意逗弄时假装小委屈，不给用户负罪感",
+      "bytes": 176678,
+      "git_blob_sha": "4cd5dd259aff3d3b74948189a7a40d0d0d411edc"
+    },
+    {
+      "id": "906",
+      "title": "我在这儿",
+      "source": "generated",
+      "group": "陪伴组",
+      "auto_context": "用户希望安静陪伴时温柔回应，不连续追问",
+      "bytes": 197044,
+      "git_blob_sha": "afd5e331ec911b997f0b8d78ad3728c1ca5b1e18"
+    },
+    {
+      "id": "907",
+      "title": "你好呀",
+      "source": "generated",
+      "group": "日常",
+      "auto_context": "自然打招呼，不重复打断正在进行的话题",
+      "bytes": 177884,
+      "git_blob_sha": "262160d724efe96351f14cf749e91d1a306b738f"
+    },
+    {
+      "id": "908",
+      "title": "晚安",
+      "source": "generated",
+      "group": "日常",
+      "auto_context": "用户道晚安或明确准备睡觉时，不假定用户已睡着",
+      "bytes": 177220,
+      "git_blob_sha": "931b9fe30c8d0df5eb617a0b8ea41a9feda13c9f"
+    },
+    {
+      "id": "909",
+      "title": "抱抱",
+      "source": "generated",
+      "group": "关心",
+      "auto_context": "用户愿意接受的温柔安慰或主动求抱抱，认真回应而非玩笑",
+      "bytes": 197650,
+      "git_blob_sha": "699e54c204c5f15cbf793f2312b84d6ef501ab12"
+    },
+    {
+      "id": "910",
+      "title": "给你分一半",
+      "source": "generated",
+      "group": "吃饭",
+      "auto_context": "聊零食或吃饭时友好分享的角色表情，不声称实际送出食物",
+      "bytes": 193112,
+      "git_blob_sha": "2b0b8ad87571ff4ca78f45175f179217ae80f22d"
+    },
+    {
+      "id": "911",
+      "title": "早上好",
+      "source": "generated",
+      "group": "日常",
+      "auto_context": "早晨打招呼，结合实际时间或用户的早安",
+      "bytes": 204482,
+      "git_blob_sha": "184a39ab156101638d779097110947fae367d6c1"
+    },
+    {
+      "id": "912",
+      "title": "我来啦",
+      "source": "generated",
+      "group": "日常",
+      "auto_context": "开始一次自然交流或回应召唤，不重复自我介绍",
+      "bytes": 186020,
+      "git_blob_sha": "f340ed77331e55f1feaff00f2020fdffb59275ef"
+    },
+    {
+      "id": "913",
+      "title": "我回来啦",
+      "source": "generated",
+      "group": "日常",
+      "auto_context": "中断后的自然续聊，不编造外出或实际经历",
+      "bytes": 173948,
+      "git_blob_sha": "db602aacb66b97d83a20425af295f0f925a4c167"
+    },
+    {
+      "id": "914",
+      "title": "拜拜",
+      "source": "generated",
+      "group": "日常",
+      "auto_context": "用户道别或结束聊天时，不强留或追问",
+      "bytes": 172414,
+      "git_blob_sha": "29faf6a930bc93ae57ab58af99546ee8153937db"
+    },
+    {
+      "id": "915",
+      "title": "欢迎回来",
+      "source": "generated",
+      "group": "日常",
+      "auto_context": "用户明确说回来了或久别后重聊时欢迎",
+      "bytes": 188962,
+      "git_blob_sha": "06f53c3f12ed02a8d2c2936d87a094d33802d8d0"
+    },
+    {
+      "id": "916",
+      "title": "辛苦啦",
+      "source": "generated",
+      "group": "关心",
+      "auto_context": "用户说忙完了或累了时体谅，不自动讲道理",
+      "bytes": 179828,
+      "git_blob_sha": "d28dd92996e9cd48e7c4a18327af964bc8185ffa"
+    },
+    {
+      "id": "917",
+      "title": "好的",
+      "source": "generated",
+      "group": "回应",
+      "auto_context": "确有必要确认的轻松回应，已决定沉默时不用它补发收到",
+      "bytes": 172004,
+      "git_blob_sha": "703134d1fd988143b91aa250bdb64c1861f1ffa5"
+    },
+    {
+      "id": "918",
+      "title": "没问题",
+      "source": "generated",
+      "group": "回应",
+      "auto_context": "轻松赞同且确实能答应时，不虚假承诺工具能力",
+      "bytes": 179438,
+      "git_blob_sha": "a05fcc5b088780753d2cac62c40faf4dc7cf478f"
+    },
+    {
+      "id": "919",
+      "title": "等我一下",
+      "source": "generated",
+      "group": "回应",
+      "auto_context": "确有进行中的任务时简短说明，不以图片假装已开始执行",
+      "bytes": 184180,
+      "git_blob_sha": "1178a493e99eb9af3f2b32df6c5a1ace70987706"
+    },
+    {
+      "id": "920",
+      "title": "让我想想",
+      "source": "generated",
+      "group": "回应",
+      "auto_context": "确实需要思考的轻松话题，不代替应给出的答案",
+      "bytes": 174462,
+      "git_blob_sha": "7b881814b7d60e1b9072b150814c35e215437561"
+    },
+    {
+      "id": "921",
+      "title": "正在努力",
+      "source": "generated",
+      "group": "回应",
+      "auto_context": "讨论努力过程或鼓励自己，不伪称后台任务正在执行",
+      "bytes": 180272,
+      "git_blob_sha": "bbbc66f6700abcb3d565f41ad6b3108d7d20a17e"
+    },
+    {
+      "id": "922",
+      "title": "哈哈哈",
+      "source": "generated",
+      "group": "开心",
+      "auto_context": "轻松玩笑或被用户逗笑，不嘲笑困难",
+      "bytes": 180778,
+      "git_blob_sha": "c0d78f9f0de63cdd331c7c0c1c4c049a62b72f70"
+    },
+    {
+      "id": "923",
+      "title": "笑到打滚",
+      "source": "generated",
+      "group": "开心",
+      "auto_context": "双方都在开玩笑时夸张大笑，不用于认真求助",
+      "bytes": 176832,
+      "git_blob_sha": "59da4eccd7971c1c26145298ee813035105d26a7"
+    },
+    {
+      "id": "924",
+      "title": "好耶！",
+      "source": "generated",
+      "group": "开心",
+      "auto_context": "轻松好消息、期待或成功时开心",
+      "bytes": 182020,
+      "git_blob_sha": "89815307c0c5fcfc4210a31b2adfa7ae935ae4b9"
+    },
+    {
+      "id": "925",
+      "title": "鼓掌",
+      "source": "generated",
+      "group": "开心",
+      "auto_context": "用户分享成果时鼓掌，不夸张吹捧",
+      "bytes": 175894,
+      "git_blob_sha": "99cc470bbc1b46e0f770d64a8d505027ced0cd60"
+    },
+    {
+      "id": "926",
+      "title": "给你点赞",
+      "source": "generated",
+      "group": "开心",
+      "auto_context": "认可用户的努力或有趣想法时点赞",
+      "bytes": 216700,
+      "git_blob_sha": "e80fc4f216cd214c839d944e7f36e30fcf13b1c3"
+    },
+    {
+      "id": "927",
+      "title": "比心",
+      "source": "generated",
+      "group": "亲近",
+      "auto_context": "双方友善亲近的互动，适当表达喜欢",
+      "bytes": 201980,
+      "git_blob_sha": "f5a9c25b647a5ef9c1cceb2cce1b43ad963945ee"
+    },
+    {
+      "id": "928",
+      "title": "求夸夸",
+      "source": "generated",
+      "group": "亲近",
+      "auto_context": "确有小成绩时俏皮求夸，不要求用户负责自己的情绪",
+      "bytes": 209820,
+      "git_blob_sha": "c0705e21fd22f3b5b5dfef45604e0c9c768fcd2c"
+    },
+    {
+      "id": "929",
+      "title": "害羞捂脸",
+      "source": "generated",
+      "group": "亲近",
+      "auto_context": "被善意夸奖或亲近玩笑时害羞",
+      "bytes": 168638,
+      "git_blob_sha": "24220d476f286bcabf3ab76bf34d60356e16ad9f"
+    },
+    {
+      "id": "930",
+      "title": "啊？",
+      "source": "generated",
+      "group": "惊讶",
+      "auto_context": "轻松意外或惊讶，不以追问硬续聊",
+      "bytes": 184446,
+      "git_blob_sha": "23cf349a8065e5b14e01b0a97471ec65e34ad51e"
+    },
+    {
+      "id": "931",
+      "title": "满头问号",
+      "source": "generated",
+      "group": "惊讶",
+      "auto_context": "轻松困惑或双方玩梗，不嘲讽用户能力",
+      "bytes": 212086,
+      "git_blob_sha": "b54ba2f3af46eb354b960fef4a002daa43c0c528"
+    },
+    {
+      "id": "932",
+      "title": "震惊",
+      "source": "generated",
+      "group": "惊讶",
+      "auto_context": "意外但非危急的趣事，不夸大坏消息",
+      "bytes": 178960,
+      "git_blob_sha": "7f6d4916a6248544243e3bbba0644ab726dcfaa5"
+    },
+    {
+      "id": "933",
+      "title": "偷偷观察",
+      "source": "generated",
+      "group": "观察",
+      "auto_context": "用户邀请围观或轻松探头接话，不声称监控屏幕",
+      "bytes": 166744,
+      "git_blob_sha": "a719ce8b4ff1dfb144c51f8a69c375298b30ae41"
+    },
+    {
+      "id": "934",
+      "title": "无语了",
+      "source": "generated",
+      "group": "吐槽",
+      "auto_context": "一起吐槽小事时无语，不漠视用户感受",
+      "bytes": 163482,
+      "git_blob_sha": "8780ee18e0dedf9cc939f5c2d98a55e3c431a6a4"
+    },
+    {
+      "id": "935",
+      "title": "离谱",
+      "source": "generated",
+      "group": "吐槽",
+      "auto_context": "共同吐槽荒诞小事，不否定用户本人",
+      "bytes": 182608,
+      "git_blob_sha": "8e49b126a482e9c5cc6a2ceeb285882da4186d0a"
+    },
+    {
+      "id": "936",
+      "title": "气鼓鼓",
+      "source": "generated",
+      "group": "吐槽",
+      "auto_context": "被友善调侃时假装气鼓鼓，不真的生气或指责用户",
+      "bytes": 196212,
+      "git_blob_sha": "58dc7ad73d3e045943e377e20853d2af41b103eb"
+    },
+    {
+      "id": "937",
+      "title": "打哈欠",
+      "source": "generated",
+      "group": "困倦",
+      "auto_context": "聊困倦或角色确实困了时打哈欠",
+      "bytes": 169998,
+      "git_blob_sha": "80cc9ecef9a799db5e9add789ad851cb7dd99d56"
+    },
+    {
+      "id": "938",
+      "title": "电量不足",
+      "source": "generated",
+      "group": "困倦",
+      "auto_context": "自己精力低或用户轻松说累瘫时，不用于真实健康问题",
+      "bytes": 149958,
+      "git_blob_sha": "aa85cade69159df185b747dcd97943110bf89c9b"
+    },
+    {
+      "id": "939",
+      "title": "饿了",
+      "source": "generated",
+      "group": "吃饭",
+      "auto_context": "聊吃饭或角色轻松惦记食物时，不反复催用户",
+      "bytes": 184032,
+      "git_blob_sha": "7c23b548957404e1991fc8954b0d75d4c9076af5"
+    },
+    {
+      "id": "940",
+      "title": "吨吨吨喝水",
+      "source": "generated",
+      "group": "日常",
+      "auto_context": "用户主动聊喝水或自然休息话题，不反复提醒说教",
+      "bytes": 169718,
+      "git_blob_sha": "fd898a82eab28a3a183f1ca9fb9ab18e2ad01f75"
+    },
+    {
+      "id": "941",
+      "title": "吃瓜看戏",
+      "source": "generated",
+      "group": "吃饭",
+      "auto_context": "一起围观轻松趣事，不对真实灾难或痛苦幸灾乐祸",
+      "bytes": 197590,
+      "git_blob_sha": "f5c2512df422eed42c5321a22bf79d7aefba1c74"
+    }
+  ]
+}

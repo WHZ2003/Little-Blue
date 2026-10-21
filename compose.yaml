@@ -1,0 +1,43 @@
+name: little-blue
+services:
+  core:
+    build: .
+    image: little-blue-core:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8765:8765"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LITTLE_BLUE_DATA_DIR: /data
+      TZ: America/New_York
+      LITTLE_BLUE_EMBEDDING_MODEL_DIR: /models/bge-small-zh-v1.5
+    volumes:
+      - core-data:/data
+      - ./assets/memes:/app/assets/memes:ro
+      - ./models:/models:ro
+    secrets:
+      - core_token
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 1g
+    cpus: 1.0
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+volumes:
+  core-data:
+secrets:
+  core_token:
+    file: ./.secrets/core_token

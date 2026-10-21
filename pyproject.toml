@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "little-blue"
+version = "0.1.0"
+description = "An offline-first artificial-life desktop companion"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.10,<3", "httpx>=0.28,<1"]
+
+[project.optional-dependencies]
+memory = ["fastembed==0.9.0"]
+desktop = ["PySide6>=6.8,<7"]
+core = ["aiohttp>=3.11,<4", "qrcode>=8.2,<9", "cryptography>=48,<49"]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "pyinstaller>=6", "pillow>=11", "PySide6>=6.8,<7", "aiohttp>=3.11,<4", "qrcode>=8.2,<9", "cryptography>=48,<49"]
+browser = ["playwright>=1.50"]
+
+[project.scripts]
+little-blue = "little_blue.__main__:main"
+little-blue-core = "little_blue.service:main"
+
+[tool.setuptools.packages.find]
+include = ["little_blue*"]
+
+[tool.setuptools.package-data]
+little_blue = ["*-LICENSE.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

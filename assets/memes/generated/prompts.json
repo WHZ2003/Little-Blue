@@ -1,0 +1,297 @@
+{
+  "generator": "built-in image_gen",
+  "common_prompt": "Use case: illustration-story. Asset type: one square Chinese WeChat reaction meme, NOT a sheet. References are STYLE and CHARACTER references only, not images to edit. Match the clean expressive anime meme drawing of reference 010 and the blue-haired whale maid character of reference 056. One original chibi blue-haired whale girl with long blue hair, blue fin ears, blue whale tail, small white maid headband and navy-and-white maid outfit. Crisp dark navy outlines, simple cel shading, expressive readable face, white background. Medium close-up fills the square, generous safe margin. Exact Chinese caption centered at bottom in bold dark navy Chinese lettering with white outline, extremely readable. No other lettering, no logos, no watermark, no panels. Keep cute and playful, consistent character across collection. ",
+  "references": [
+    "community/010.webp",
+    "community/056.webp"
+  ],
+  "items": [
+    {
+      "id": "901",
+      "group": "得意组",
+      "title": "让我得意一下",
+      "scene": "She looks smug and delighted, chin lifted, hands on hips, tiny sparkling stars. Playful pride, no contempt.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-d18c08bc-2693-4dc4-bcbe-6ba52064c4e0.png"
+    },
+    {
+      "id": "902",
+      "group": "得意组",
+      "title": "搞定！",
+      "scene": "She raises both little fists joyfully, eyes sparkling with a huge relieved grin. A few blue and gold confetti pieces.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-2839b38b-f931-4375-9e6f-2cb1b5cbbe1e.png"
+    },
+    {
+      "id": "903",
+      "group": "吐槽组",
+      "title": "你最好是",
+      "scene": "She gives a sideways half-lidded skeptical look with one eyebrow raised, arms folded, restrained affectionate teasing, not angry.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-933fb1e9-ced9-4913-a0c1-18e45f86c749.png"
+    },
+    {
+      "id": "904",
+      "group": "吐槽组",
+      "title": "摸一小会儿",
+      "scene": "She peeks mischievously over a tiny desk with a pencil put aside, guilty little smile, hands resting on desktop.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-5ccb9fcf-00b6-4ccb-af3f-c37c9a04a9ab.png"
+    },
+    {
+      "id": "905",
+      "group": "陪伴组",
+      "title": "鱼鱼委屈",
+      "scene": "She pouts with watery eyes and puffed cheeks, hugs her own large whale tail like a cushion; comically mildly aggrieved, not distressed.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-b6365602-fa52-45bd-ba68-7e8598fa9b47.png"
+    },
+    {
+      "id": "906",
+      "group": "陪伴组",
+      "title": "我在这儿",
+      "scene": "She rests her cheek in her palm at a tiny desk, relaxed warm smile, quietly keeping company. No dramatic affection or dependence.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-0014c6a1-3eff-4518-8ee9-351d41ab9235.png"
+    },
+    {
+      "id": "907",
+      "group": "日常",
+      "title": "你好呀",
+      "scene": "Cheerfully waving with an open hand, bright welcoming smile and small blue bubbles.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-bcab20ad-9ead-43c2-aa0c-1e49bbab1697.png"
+    },
+    {
+      "id": "908",
+      "group": "日常",
+      "title": "晚安",
+      "scene": "Sleepily hugging a pale blue pillow, eyes gently closed, tiny moon and star.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-ee7cbd87-7725-4c00-b6db-806c2b4fed55.png"
+    },
+    {
+      "id": "909",
+      "group": "关心",
+      "title": "抱抱",
+      "scene": "Opening both arms toward viewer, warm soft comforting smile, one small blue heart.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-e9f770c2-cf56-4597-b49f-e6bd88f4f1ae.png"
+    },
+    {
+      "id": "910",
+      "group": "吃饭",
+      "title": "给你分一半",
+      "scene": "Offering one half of a split round steamed bun to viewer, another half in other hand, generous happy grin.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-78cf04b5-5d7a-4ac9-bfa9-f1a2cf4857b1.png"
+    },
+    {
+      "id": "911",
+      "group": "日常",
+      "title": "早上好",
+      "scene": "Stretching both arms high, refreshed smile, tiny rising sun doodle.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-a01f7aab-738d-4de4-a40f-9c106ff776c9.png"
+    },
+    {
+      "id": "912",
+      "group": "日常",
+      "title": "我来啦",
+      "scene": "Leaning into frame energetically, one raised hand, eager grin and little speed lines.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-70106778-e2bb-441f-b677-b0e2a1cef46c.png"
+    },
+    {
+      "id": "913",
+      "group": "日常",
+      "title": "我回来啦",
+      "scene": "Peeking around a simple doorway with happy smile, one hand holding door frame.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-12a27174-127e-486b-b2af-212734a51091.png"
+    },
+    {
+      "id": "914",
+      "group": "日常",
+      "title": "拜拜",
+      "scene": "Waving while looking over shoulder, warm farewell smile, hair and tail swaying.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-65f65cf9-00af-4d2d-a5b1-29d29042c3e9.png"
+    },
+    {
+      "id": "915",
+      "group": "日常",
+      "title": "欢迎回来",
+      "scene": "Leaning forward with hands clasped behind back and delighted eyes, warm welcome.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-a678449f-bfeb-4663-add5-e74e6cdba9ae.png"
+    },
+    {
+      "id": "916",
+      "group": "关心",
+      "title": "辛苦啦",
+      "scene": "Offering a small cup of tea, gentle appreciative smile, respectful and calm.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-a64e96d0-b99c-4abd-ba6a-82f34e01dfb6.png"
+    },
+    {
+      "id": "917",
+      "group": "回应",
+      "title": "好的",
+      "scene": "Giving a simple OK hand gesture, relaxed friendly smile and slight nod.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-ef3e4380-27c6-496f-b620-80e60ab4894f.png"
+    },
+    {
+      "id": "918",
+      "group": "回应",
+      "title": "没问题",
+      "scene": "Confident thumbs-up, bright reassuring smile, tiny sparkle.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-19a8d82f-26d4-4d17-bcf2-5d9038553f19.png"
+    },
+    {
+      "id": "919",
+      "group": "回应",
+      "title": "等我一下",
+      "scene": "One hand raised palm forward in wait gesture, mildly flustered determined face.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-ebf1cabc-0c63-4a0d-b3fa-a0ed3384989d.png"
+    },
+    {
+      "id": "920",
+      "group": "回应",
+      "title": "让我想想",
+      "scene": "Finger resting at cheek, looking thoughtfully upward at one small blue thought bubble.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-774abf37-cd55-4ab5-aff3-db9130b5b19f.png"
+    },
+    {
+      "id": "921",
+      "group": "回应",
+      "title": "正在努力",
+      "scene": "Sitting at a desk writing with a pencil, concentrating, puffed cheeks, one small sweat drop.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-bb12de70-52dd-465c-9e48-daf571623bb2.png"
+    },
+    {
+      "id": "922",
+      "group": "开心",
+      "title": "哈哈哈",
+      "scene": "Head tilted back with eyes shut in hearty laughter, hand over mouth, shoulders bouncing.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-49470a9e-4698-4402-8fe4-459bd1baf6a0.png"
+    },
+    {
+      "id": "923",
+      "group": "开心",
+      "title": "笑到打滚",
+      "scene": "Full-body tiny chibi rolling sideways with laughter on a white floor, tears of laughter, tail curled.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-ce26c650-4649-47b1-a8af-9731ff8beb56.png"
+    },
+    {
+      "id": "924",
+      "group": "开心",
+      "title": "好耶！",
+      "scene": "Jumping with both arms up, huge happy grin, one celebratory burst, full body small chibi.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-6ca9b99f-55d4-466e-9848-5267e682246e.png"
+    },
+    {
+      "id": "925",
+      "group": "开心",
+      "title": "鼓掌",
+      "scene": "Clapping both hands in front of chest, sparkling admiring eyes and little clap motion lines.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-f53bbe1a-3b7e-433b-a3ba-a0c4c7873420.png"
+    },
+    {
+      "id": "926",
+      "group": "开心",
+      "title": "给你点赞",
+      "scene": "Both thumbs-up toward viewer, wide delighted smile, small gold stars.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-b34a6d16-0290-48d5-8775-73fd97f696b0.png"
+    },
+    {
+      "id": "927",
+      "group": "亲近",
+      "title": "比心",
+      "scene": "Making a heart shape with both hands, shy warm smile and pink cheeks, small blue hearts.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-7242f201-12db-496c-9c93-753efeed9265.png"
+    },
+    {
+      "id": "928",
+      "group": "亲近",
+      "title": "求夸夸",
+      "scene": "Pointing both index fingers toward her own face with expectant sparkling eyes, playful proud smile.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-3511419e-c569-49b6-af0e-52ba2bccd6db.png"
+    },
+    {
+      "id": "929",
+      "group": "亲近",
+      "title": "害羞捂脸",
+      "scene": "Covering pink cheeks with both hands, one eye shyly peeking through fingers.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-d03b11a6-f35c-4623-8e44-6378e83a3563.png"
+    },
+    {
+      "id": "930",
+      "group": "惊讶",
+      "title": "啊？",
+      "scene": "Head tilted sharply, eyes wide, mouth small and open, one large stylized question mark doodle.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-497a4194-8aad-4792-962a-f91e4bd07199.png"
+    },
+    {
+      "id": "931",
+      "group": "惊讶",
+      "title": "满头问号",
+      "scene": "Baffled face with furrowed brows, palms facing up, three blue question marks floating overhead.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-a3b1ffc6-420c-480a-9eb9-4b13dd47cf65.png"
+    },
+    {
+      "id": "932",
+      "group": "惊讶",
+      "title": "震惊",
+      "scene": "Eyes very wide, both hands against cheeks, exaggerated astonishment, spiky blue reaction lines.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-12cde453-4fe3-4851-8c60-1bfba2038e86.png"
+    },
+    {
+      "id": "933",
+      "group": "观察",
+      "title": "偷偷观察",
+      "scene": "Peeking from behind her big whale tail like a curtain, only curious eyes and upper face visible.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-fe7dd411-6e4e-4a78-b364-4c274cf372ea.png"
+    },
+    {
+      "id": "934",
+      "group": "吐槽",
+      "title": "无语了",
+      "scene": "Flat unimpressed half-lidded eyes, mouth a straight line, one hand at forehead, tiny ellipsis doodle.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-f6ccb2bf-c601-417c-b998-af765baf5387.png"
+    },
+    {
+      "id": "935",
+      "group": "吐槽",
+      "title": "离谱",
+      "scene": "Disbelieving tilted head, one eyebrow raised, arms extended with palms up in disbelief.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-c62f0309-c87c-4d11-87e9-9ae9d51cacdf.png"
+    },
+    {
+      "id": "936",
+      "group": "吐槽",
+      "title": "气鼓鼓",
+      "scene": "Puffed cheeks, arms folded, comically sulky eyebrows, tiny harmless steam puffs.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-8c50de47-a494-4ab9-902d-2474ab28d83f.png"
+    },
+    {
+      "id": "937",
+      "group": "困倦",
+      "title": "打哈欠",
+      "scene": "Yawning broadly with one hand politely covering mouth, sleepy drooping eyes.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-41726e10-f5d6-42be-ab39-dc92dad7a991.png"
+    },
+    {
+      "id": "938",
+      "group": "困倦",
+      "title": "电量不足",
+      "scene": "Slumped forward with cheek on desk, exhausted sleepy eyes, tiny nearly empty battery icon with NO letters or numbers.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-a7c41c82-9e44-4f0e-abb2-dd7e6abf4a76.png"
+    },
+    {
+      "id": "939",
+      "group": "吃饭",
+      "title": "饿了",
+      "scene": "Hands on tummy, hungry wistful face, small thought bubble with a plain steamed bun.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-d091ec70-4496-47ee-b9ac-055389001f10.png"
+    },
+    {
+      "id": "940",
+      "group": "日常",
+      "title": "吨吨吨喝水",
+      "scene": "Holding a clear water glass with both hands and drinking eagerly, cheeks a little puffed.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-47db144b-dc5e-47e5-bec6-3f9f01fda8cf.png"
+    },
+    {
+      "id": "941",
+      "group": "吃饭",
+      "title": "吃瓜看戏",
+      "scene": "Holding a watermelon slice, peeking above it with amused sparkling eyes, playful spectator mood.",
+      "original_png": "C:\\Users\\Lemovo\\.codex\\generated_images\\01a15b5b-37db-7770-bd6a-82c642abd64b\\exec-0c8758e4-8351-4b5d-abb9-d80fe0491dec.png"
+    }
+  ]
+}
