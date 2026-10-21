@@ -13,6 +13,7 @@ from .memes import MemeCatalog, MemeGate
 from .errors import CognitiveError
 from .topic import TopicSummary
 from .conversation_scene import reply_guidance, scene
+from .dialogue_style import prompt as dialogue_style_prompt
 
 NO_REPLY = '[[no_reply]]'
 REPLY_POLICY = (
@@ -234,6 +235,10 @@ class Agent:
                 '最近原话和用户更正优先。接住当前话题，已答过的补充可以不再回复；'
                 '真正的新问题不能因消息短而忽略。历史助手发言也不等于事情已经完成。'})
             history = [r for r in self.store.continuity.history() if r['id'] not in self.current_message_ids]
+            previous_user = next((r['text'] for r in reversed(history) if r['role'] == 'user'), '')
+            style_prompt = dialogue_style_prompt(self.store, text, scene(self.store), previous_user, proactive)
+            if style_prompt:
+                messages.append({'role': 'system', 'content': style_prompt})
             messages.extend({'role': r['role'], 'content': r['text'][:2000]} for r in history[-12:])
             messages.append({'role': 'system', 'content': reply_guidance(scene(self.store))})
         messages.append({"role": "user", "content": text[:2000]})

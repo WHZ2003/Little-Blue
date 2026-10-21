@@ -24,7 +24,7 @@ little-blue-core = "little_blue.service:main"
 include = ["little_blue*"]
 
 [tool.setuptools.package-data]
-little_blue = ["*-LICENSE.txt"]
+little_blue = ["*-LICENSE.txt", "dialogue_examples.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

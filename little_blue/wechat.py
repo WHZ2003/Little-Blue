@@ -245,7 +245,7 @@ class WeChatChannel:
             return True
         items = self.memes.available()
         reply = ('自动配图：' + ('开' if self.meme_gate.enabled() else '关') +
-                 '\n自动配图至少间隔1分钟，每小时最多8张，有合适情绪才发。' +
+                 '\n自动配图自由选择，不设每小时张数配额；仅保留10秒发送间隔防刷屏。' +
                  '\n发送 /meme 编号 点发；/memes off 关闭自动配图，仍可手动点发。\n' +
                  '\n'.join(i['id'] + ' · ' + i['title'] for i in items))
         if not items:

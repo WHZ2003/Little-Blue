@@ -13,7 +13,8 @@ for distribution in ('PySide6', 'PySide6_Essentials', 'shiboken6', 'httpx', 'htt
 a = Analysis([str(root / 'launch.py')], pathex=[str(root)],
              binaries=extra_binaries,
              datas=[(str(root / 'assets'), 'assets'), (str(root / 'README.md'), '.'),
-                    (str(root / 'docs'), 'docs')] + metadata,
+                    (str(root / 'docs'), 'docs'),
+                    (str(root / 'little_blue/dialogue_examples.json'), 'little_blue')] + metadata,
              hiddenimports=[], excludes=['PySide6.QtWebEngineCore', 'PySide6.QtWebEngineWidgets',
                                          'PySide6.QtPdf', 'tkinter', 'numpy', 'PIL', 'pytest'])
 pyz = PYZ(a.pure)

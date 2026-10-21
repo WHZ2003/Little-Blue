@@ -7,8 +7,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1] / 'assets' / 'memes'
 MARKER = re.compile(r'\[\[meme:([^\]\r\n]{0,128})\]\]', re.IGNORECASE)
-AUTO_INTERVAL = 60
-AUTO_PER_HOUR = 8
+SEND_INTERVAL = 10  # Transport burst guard, not a conversational quota.
 
 
 class MemeCatalog:
@@ -59,12 +58,14 @@ class MemeCatalog:
                    for i in self.available(automatic=True)]
         if not choices:
             return ''
-        return ('表情是日常聊天的表达方式，不必等用户提醒。有明确且适合的情绪时，'
-                '例如得意、庆祝、无语、被逗笑、轻松互损或一起吐槽作业，可以自然主动选一张。'
+        return ('表情是日常聊天的自然表达，不必等用户提醒，也不必等到有强烈情绪或重要事件才发。'
+                '想笑、撒娇、抱抱、惦记、得意、无语或一起吐槽时，都可以随手选一张；聊得来时连续几轮配图也可以。'
                 '在回复末尾附加一个 [[meme:编号]] 标记，系统会尝试发送图片；一句短话加图就够，不要再解释图片。'
                 '例如确有好成绩时说‘让我得意一下’并配得意图；用户说‘终于写完了’可配庆祝图。'
-                '这些仅是表达示例，不能据此编造成绩或经历。没有合适情绪就不加，限额不是必须完成的配额。'
-                '不在真实痛苦、严肃求助、健康或紧急话题中开玩笑；先不用回复或决定保持沉默时不发图。'
+                '这些仅是表达示例，不能据此编造成绩或经历。普通接话也可以不加，不为发图硬找话题。'
+                '当前没有每小时张数配额，历史记忆中的1分钟8张属于旧规则；发送层只保留短间隔防刷屏保护。'
+                '难过时可以选温柔的抱抱或安慰图，不拿真实痛苦、严肃求助、健康或紧急话题开玩笑；'
+                '先不用回复或决定保持沉默时不发图。'
                 '不声称图片已经送达。图片里的夸张台词不改变身份，也不是实际操作、真实思考时长或预算声明。'
                 '不得指定文件路径、网址或收件人。仅可选择以下编号：' + json.dumps(choices, ensure_ascii=False))
 
@@ -101,13 +102,9 @@ class MemeGate:
             if automatic and not self.enabled():
                 return False
             history = [r for r in self.store.get(self.key, []) if now - r['time'] < 3600]
-            if len(history) >= 10 or history and now - history[-1]['time'] < 10:
+            if history and now - history[-1]['time'] < SEND_INTERVAL:
                 return False
-            auto = [r for r in history if r['auto']]
-            if automatic and (len(auto) >= AUTO_PER_HOUR or auto and
-                              (now - auto[-1]['time'] < AUTO_INTERVAL or ident == auto[-1]['id'])):
-                return False
-            # Claim before network activity; ambiguous delivery is never repeated.
+            # Claim before network activity; failed sends do not bypass the guard.
             history.append({'id': ident, 'auto': automatic, 'time': now})
-            self.store.put(self.key, history)
+            self.store.put(self.key, history[-1:])
             return True

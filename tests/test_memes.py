@@ -62,15 +62,12 @@ def test_catalog_integrity_paths_and_selector(catalog):
 def test_gate_limits_restart_and_switch(core):
     gate = MemeGate(core.store, 'owner')
     assert gate.claim('087', automatic=True, now=10000)
-    assert not gate.claim('087', automatic=True, now=11000)  # no repeated automatic picture
     assert not gate.claim('010', automatic=True, now=10001)
-    assert not gate.claim('010', automatic=True, now=10059)
-    assert gate.claim('010', automatic=True, now=10060)
-    for i in range(2, 8):
-        assert gate.claim('087' if i % 2 == 0 else '010', automatic=True, now=10000 + i * 60)
-    assert not gate.claim('123', automatic=True, now=10480)
+    assert not gate.claim('087', automatic=True, now=10009)
+    assert gate.claim('087', automatic=True, now=10010)  # Same image may fit a later turn.
     restored = MemeGate(core.store, 'owner')
-    assert not restored.claim('123', automatic=True, now=10480)
+    assert not restored.claim('123', automatic=True, now=10019)
+    assert restored.claim('123', automatic=True, now=10020)
     generation = restored.generation()
     restored.set_enabled(False)
     assert restored.generation() > generation and not restored.enabled()
@@ -95,15 +92,29 @@ def test_generated_assets_use_local_whitelist_and_integrity(catalog):
     assert all(i['id'] != '901' for i in catalog.available())
 
 
-def test_automatic_hour_window_expires_and_manual_limits_still_apply(core):
+def test_no_hourly_quota_including_legacy_history_and_repeated_images(core):
     gate = MemeGate(core.store, 'owner')
-    for i in range(8):
-        assert gate.claim('901' if i % 2 == 0 else '902', automatic=True, now=10000 + i * 60)
-    assert not gate.claim('903', automatic=True, now=10500)
-    assert gate.claim('903', automatic=True, now=13600)
-    # All pictures retain the separate 10/hour and 10s guard.
-    assert not gate.claim('904', now=13609)
-    assert gate.claim('904', now=13610)
+    core.store.put(gate.key, [{'id': '901', 'auto': True, 'time': 10000 + i * 10} for i in range(10)])
+    assert not gate.claim('902', automatic=True, now=10099)
+    for i in range(120):
+        assert gate.claim('901', automatic=i % 2 == 0, now=10100 + i * 10)
+    assert len(core.store.get(gate.key)) == 1  # Bounded technical state, no hourly counter.
+    assert not gate.claim('904', now=11300 - 1)
+    assert gate.claim('904', now=11300)
+
+
+def test_burst_guard_survives_real_reopen(tmp_path):
+    path = tmp_path / 'gate.db'
+    store = Store(path)
+    assert MemeGate(store, 'owner').claim('901', automatic=True, now=10000)
+    store.close()
+    restored = Store(path)
+    try:
+        gate = MemeGate(restored, 'owner')
+        assert not gate.claim('901', automatic=True, now=10009)
+        assert gate.claim('901', automatic=True, now=10010)
+    finally:
+        restored.close()
 
 
 @pytest.mark.parametrize('url', ['http://novac2c.cdn.weixin.qq.com/c2c/upload',
