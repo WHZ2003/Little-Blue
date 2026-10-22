@@ -46,6 +46,8 @@ class DelegatingTools(ToolRuntime):
 class Core:
     def __init__(self, store, client=None):
         self.store = store
+        self.handoff_requested = False
+        self.wechat_channel = None
         from .retrieval import MemoryRetrieval
         self.memory = MemoryRetrieval(store)
         store.retriever = self.memory
@@ -67,7 +69,7 @@ class Core:
         self.agent = Agent(store, self.settings, self.tools, client)
         from .memory_ledger import FactLearner
         self.fact_learner = FactLearner(store, self.settings, self.agent.client,
-            lambda: self.current is not None or self.wechat_receiving or self.env.interacting)
+            lambda: self.current is not None or self.wechat_receiving or self.env.interacting or self.bili.active)
         self.gate = ProactiveGate(store)
         self.pending = {}
         self.events = deque(maxlen=100)
@@ -92,6 +94,8 @@ class Core:
         self.browser_share = BrowserShare(self)
         from .bridge import BridgeHub
         self.bridge = BridgeHub(self)
+        from .bili import BiliRuntime
+        self.bili = BiliRuntime(self)
 
     @property
     def host_connected(self):
@@ -119,6 +123,8 @@ class Core:
     def snapshot(self, after=0, host_id=None):
         visible = self.host_connected and self.host_id == host_id
         return {'version': 1, 'instance_id': self.instance_id, 'sequence': self.sequence,
+                'harness': 'hermes' if self.agent.harness else 'little-blue',
+                'handoff': self.handoff_status(),
                 'wechat': self.wechat_state,
                 'communication': {'wechat_session_ready': self.wechat_ready,
                                   'wechat_receiving': self.wechat_receiving,
@@ -127,6 +133,7 @@ class Core:
                 'memory_index': self.memory.status(),
                 'phone': self.phone.snapshot(),
                 'browser': self.browser.snapshot(), 'bridge': self.bridge.snapshot(),
+                'bili': self.bili.snapshot(),
                 'settings': self.settings.model_dump(),
                 'life': {'needs': self.life.needs.model_dump(),
                          'emotion': self.life.emotion.model_dump(),
@@ -170,6 +177,7 @@ class Core:
             item['future'].set_result(value)
 
     async def cancel(self):
+        await self.bili.cancel()
         if self.job and not self.job.done():
             self.job.cancel()
             await asyncio.gather(self.job, return_exceptions=True)
@@ -200,6 +208,8 @@ class Core:
             self.last_pet = time.monotonic()
 
     def submit(self, text, task_id=None, proactive=False, reflection=False, origin='desktop', received_ids=None):
+        if self.handoff_requested and (origin != 'wechat' or proactive or reflection):
+            raise RuntimeError('Handoff is draining; new tasks are paused')
         if origin not in ('desktop', 'wechat'):
             raise ValueError('Invalid origin')
         if self.job and not self.job.done():
@@ -219,6 +229,7 @@ class Core:
                                          'environment': self.env.model_dump(),
                                          'communication': {'微信状态': self.wechat_state, '微信会话可用': self.wechat_ready}}
         try:
+            await self.bili.cancel()  # Yield the single Hermes worker to a user/chat task first.
             if info['origin'] == 'wechat':
                 kwargs = {'received_ids': received_ids} if received_ids else {}
                 answer = await self.agent.run(text, state, info['proactive'], info['reflection'], info['id'], chat_only=True, **kwargs)
@@ -249,16 +260,44 @@ class Core:
         self.store.put('life', {'needs': self.life.needs.model_dump(),
                                'emotion': self.life.emotion.model_dump()})
 
+    def handoff_status(self):
+        channel = self.wechat_channel
+        drained = (not self.current and (channel is None or channel.stopping or
+                   (channel.poll_paused and channel.queue.empty() and not channel.processing
+                    and channel.held is None and (not channel.image_job or channel.image_job.done()))))
+        return {'requested': self.handoff_requested, 'drained': self.handoff_requested and drained}
+
+    async def prepare_handoff(self):
+        if self.bridge.active():
+            raise RuntimeError('Handoff currently supports the iLink channel only')
+        from pathlib import Path
+        from .handoff_guard import read_state, write_state
+        folder = Path(self.store.path).parent
+        state = read_state(folder)
+        if state.get('phase') not in (None, 'active', 'draining'):
+            raise RuntimeError('This copy has already been handed off')
+        write_state(folder, {**state, 'phase': 'draining'})
+        self.handoff_requested = True
+        await self.bili.close()
+        await self.fact_learner.close()
+        await self.browser.close()
+        await self.browser_share.close()
+        self.save()
+        return self.handoff_status()
+
     async def start(self):
         await self.memory.start()
         await self.fact_learner.start()
         await self.browser.start()
+        await self.bili.start()
         self.loop_task = asyncio.create_task(self._loop())
 
     async def _loop(self):
         last = time.monotonic()
         while True:
             await asyncio.sleep(.25)
+            if self.handoff_requested:
+                continue
             now = time.monotonic()
             dt, last = min(now - last, 1), now
             if not self.host_connected:
@@ -269,7 +308,7 @@ class Core:
                 self.env = Environment(hour=time.localtime().tm_hour, focused=self.settings.dnd)
             before = self.life.goal
             self.life.tick(dt, self.env)
-            self.phone.tick(dt, self.life, self.env, busy=self.current is not None or self.browser.snapshot()['active'],
+            self.phone.tick(dt, self.life, self.env, busy=self.current is not None or self.browser.snapshot()['active'] or self.bili.active,
                             manual_present=self.host_connected and self.env.phone_open)
             if before != self.life.goal:
                 self.store.working.append(f'自主目标：{self.life.goal}')
@@ -287,7 +326,7 @@ class Core:
                     self.store.continuity.append('assistant', '提醒：' + reminder['text'],
                                                  'desktop' if self.host_connected else 'wechat')
                     self.emit('reminder', text=reminder['text'])
-            if not quiet and not self.current and not self.wechat_receiving:
+            if not quiet and not self.current and not self.wechat_receiving and not self.bili.active:
                 followup = self.store.continuity.claim_followup(wall, self.settings, self.env, self.gate)
                 if followup:
                     origin = 'desktop' if self.host_connected else 'wechat'
@@ -318,6 +357,7 @@ class Core:
         if self.loop_task:
             self.loop_task.cancel()
             await asyncio.gather(self.loop_task, return_exceptions=True)
+        await self.bili.close()
         await self.cancel()
         await self.fact_learner.close()
         await self.browser.close()

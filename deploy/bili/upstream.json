@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/c1overzz/dsh-bili-scroll",
+  "commit": "9605fd5baf33e1e2ea6d987622fb47304e0adcc3",
+  "version": "2.0.0",
+  "license": "MIT",
+  "embedded_source": "vendor/bilibili-mcp (AGI_Ananas, MIT)",
+  "integration": "Read-only Python adaptation for Hermes; no DSH host, posting or ASR runtime",
+  "bilibili_api_python": "17.4.2"
+}

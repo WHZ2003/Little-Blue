@@ -16,6 +16,9 @@ def main():
     parser.add_argument("--core-token-file", type=Path, default=Path(".secrets/core_token"))
     args = parser.parse_args()
     data_dir = args.data_dir or Path(os.environ.get("LOCALAPPDATA", Path.home())) / "LittleBlue"
+    if not args.core_url:
+        from .handoff_guard import require_active
+        require_active(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     handler = RotatingFileHandler(data_dir / "little-blue.log", maxBytes=1000000, backupCount=3, encoding="utf-8")
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO, handlers=[handler],

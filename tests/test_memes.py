@@ -76,6 +76,19 @@ def test_gate_limits_restart_and_switch(core):
     assert not restored.claim('010', now=16001)
 
 
+def test_shortlist_distinguishes_affectionate_joke_food_and_distress(catalog):
+    original = catalog.read('087')
+    for ident in ('936', '939', '909', '916'):
+        (catalog.root / 'community' / (ident + '.webp')).write_bytes(original)
+        catalog.items[ident] = dict(catalog.items['087'], id=ident)
+    assert [i['id'] for i in catalog.suggestions('饿了，我能吃口你吗')] == ['936']
+    assert [i['id'] for i in catalog.suggestions('写饿了')] == ['939']
+    assert {i['id'] for i in catalog.suggestions('我好难受，别笑了', avoid_teasing=True)} == {'909', '916'}
+    assert catalog.prompt('不用回复') == ''
+    (catalog.root / 'community/939.webp').write_bytes(b'broken')
+    assert catalog.suggestions('写饿了') == []
+
+
 def test_generated_assets_use_local_whitelist_and_integrity(catalog):
     original = catalog.read('087')
     folder = catalog.root / 'generated'
@@ -204,6 +217,7 @@ async def test_agent_selects_valid_meme_without_tool_or_marker_in_memory(core, c
     agent.memes = catalog
     assert await agent.run('讲个玩笑', {}, chat_only=True) == '哈哈！'
     assert agent.meme_id == '087'
+    assert core.store.db.execute("SELECT decision FROM audit WHERE tool='meme_choice' ORDER BY id DESC LIMIT 1").fetchone()[0] == 'selected:087'
     assert all('[[meme:' not in m['text'] for m in core.store.search(''))
     assert '[[meme:' not in core.store.continuity.recent()[-1]['text']
 

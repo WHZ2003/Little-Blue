@@ -1,5 +1,6 @@
 """Real offline embedding integration check using only synthetic disposable memories."""
 import asyncio
+import gc
 import json
 from pathlib import Path
 import tempfile
@@ -50,6 +51,9 @@ async def main():
         finally:
             await r.close()
             store.close()
+            # Release deferred SQLite statements before Windows removes the
+            # temporary database; a closed connection can still have cursors.
+            gc.collect()
 
 
 if __name__ == '__main__':

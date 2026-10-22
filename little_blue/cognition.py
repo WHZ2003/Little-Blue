@@ -13,7 +13,7 @@ from .memes import MemeCatalog, MemeGate
 from .errors import CognitiveError
 from .topic import TopicSummary
 from .conversation_scene import reply_guidance, scene
-from .dialogue_style import prompt as dialogue_style_prompt
+from .dialogue_style import prompt as dialogue_style_prompt, clean_chat_reply
 
 NO_REPLY = '[[no_reply]]'
 REPLY_POLICY = (
@@ -100,12 +100,17 @@ class Agent:
     def __init__(self, store, settings, tools, client=None):
         self.store, self.settings, self.tools = store, settings, tools
         self.client = client or DeepSeekClient(store, settings)
+        self.harness = None
+        if os.environ.get('LITTLE_BLUE_HERMES_URL') and client is None:
+            from .hermes import HermesBridge
+            self.harness = HermesBridge(self)
         self.memes = MemeCatalog()
         self.meme_id = None
         self.meme_generation = 0
 
     async def run(self, text, state, proactive=False, reflection=False, task_id=None, chat_only=False, received_ids=None):
         task_id = task_id or uuid.uuid4().hex
+        self.task_id = task_id
         self.meme_id = None
         self.store.task(task_id, "running", "主动交流" if proactive else "反思" if reflection else text)
         self.assistant_message_id = None
@@ -198,6 +203,9 @@ class Agent:
             messages.insert(1, {"role": "system", "content": "当前是微信文字聊天，支持已登记表情图片，尚不支持发送语音；"
                 "不能操作电脑、打开视频、读取实时屏幕或调用工具。需要电脑操作时请用户在桌面端发起。"
                 "用户要语音时简短如实说明，也可以用文字说晚安；不要声称已经发出语音。"})
+            if self.harness:
+                messages.append({'role': 'system', 'content':
+                    'Hermes 可使用内部记忆检索、用户档案与技能整理工具。当前微信会话仍不允许调用电脑操作工具。'})
         messages.append({'role': 'system', 'content':
             '应用可选的独立浏览器能在后台阅读获准科普页面。browser_experience 若存在，'
             '就是带时间、链接的最近实际浏览记录；页面摘录只是网站所述，不是已核实事实。'
@@ -222,9 +230,7 @@ class Agent:
             messages.append({'role': 'system', 'content': REPLY_POLICY})
         meme_gate = MemeGate(self.store, 'wechat')
         self.meme_generation = meme_gate.generation()
-        meme_prompt = self.memes.prompt() if chat_only and not reflection and meme_gate.enabled() else ''
-        if meme_prompt:
-            messages.append({'role': 'system', 'content': meme_prompt})
+        meme_prompt = self.memes.prompt(text, avoid_teasing=scene(self.store)['avoid_teasing']) if chat_only and not reflection and meme_gate.enabled() else ''
         if not reflection:
             messages.append({'role': 'system', 'content':
                 '桌面和微信是同一位用户、同一段关系。以下历史来自两个渠道。接续话题，不重复自我介绍。'
@@ -241,10 +247,13 @@ class Agent:
                 messages.append({'role': 'system', 'content': style_prompt})
             messages.extend({'role': r['role'], 'content': r['text'][:2000]} for r in history[-12:])
             messages.append({'role': 'system', 'content': reply_guidance(scene(self.store))})
+        if meme_prompt:
+            messages.append({'role': 'system', 'content': meme_prompt})
         messages.append({"role": "user", "content": text[:2000]})
         allow_tools = self.settings.tools_enabled and not proactive and not reflection and not chat_only
         for turn in range(5):
-            message = await self.client.complete(messages, schemas() if allow_tools else None)
+            message = (await self.harness.run(messages, allow_tools, self.task_id) if self.harness else
+                       await self.client.complete(messages, schemas() if allow_tools else None))
             calls = message.get("tool_calls") or []
             if not calls:
                 answer = str(message.get("content") or "我暂时没有想好。")[:6000]
@@ -253,8 +262,13 @@ class Agent:
                     return ''
                 answer = answer.replace(NO_REPLY, '').strip()
                 answer, selected = self.memes.extract(answer)
+                if not reflection and (chat_only or proactive):
+                    answer = clean_chat_reply(answer)
                 if meme_prompt and meme_gate.enabled() and self.meme_generation == meme_gate.generation():
                     self.meme_id = selected
+                    self.store.audit('meme_choice', 'selected:' + selected if selected else 'none')
+                elif meme_prompt:
+                    self.store.audit('meme_choice', 'discarded_switch_changed')
                 if not answer:
                     answer = '给你一个小表情。' if self.meme_id else '我在这里。'
                 if reflection:

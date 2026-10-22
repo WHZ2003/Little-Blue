@@ -130,6 +130,7 @@ class WeChatChannel:
         self.cancel_generation = 0
         self.held = None
         self.processing = False
+        self.poll_paused = False
         self.accepted_mid = None
 
     def accept(self, message):
@@ -184,18 +185,22 @@ class WeChatChannel:
                     (not automatic or self.meme_gate.enabled() and
                      generation == self.meme_gate.generation() and not self.core.settings.dnd and not self.core.env.focused))
         if not permitted():
+            self.core.store.audit('wechat_meme', 'skipped_policy')
             return False
         if self.image_job and not self.image_job.done():
+            self.core.store.audit('wechat_meme', 'skipped_busy')
             if not automatic:
                 await self.send(context, '上一张表情还在发送，请稍等。')
             return False
         try:
             data = self.memes.read(ident)
         except (ValueError, OSError):
+            self.core.store.audit('wechat_meme', 'skipped_asset')
             if not automatic:
                 await self.send(context, '这张表情暂不可用，请用 /memes 查看已有编号。')
             return False
         if not self.meme_gate.claim(ident, automatic):
+            self.core.store.audit('wechat_meme', 'skipped_burst_guard')
             if not automatic:
                 await self.send(context, '表情发送有点频繁，请稍后再试。')
             return False
@@ -256,6 +261,10 @@ class WeChatChannel:
     async def poll(self):
         delay = 1
         while True:
+            if self.core.handoff_requested:
+                self.poll_paused = True
+                await asyncio.sleep(.1)
+                continue
             try:
                 result = await self.api.request('getupdates', {
                     'get_updates_buf': self.core.store.get(self.key + ':cursor', '')})
@@ -405,7 +414,12 @@ class WeChatChannel:
     async def consume_one(self, item):
         text, context, mid = item
         generation = self.cancel_generation
-        if text in ('/sharing on', '/sharing off'):
+        if text in ('/bili sharing on', '/bili sharing off'):
+            config = self.core.bili.settings.model_dump()
+            config['share_wechat'] = text.endswith(' on')
+            await self.core.bili.control({'action':'configure','settings':config})
+            await self.send(context, '好，逛 B 站遇到有意思的就把链接和心得发给你。' if config['share_wechat'] else '好，B 站心得继续记着，先不主动发给你。')
+        elif text in ('/sharing on', '/sharing off'):
             self.core.store.put('browser_sharing_enabled', text.endswith(' on'))
             await self.send(context, '好，看到有趣的再分享给你。' if text.endswith(' on') else '好，逛网页的事先留给我自己。')
         elif text.split()[:1] == ['/meme']:
@@ -502,7 +516,7 @@ class WeChatChannel:
         events = [e for e in self.core.events if e['seq'] > self.last_event]
         self.last_event = self.core.sequence
         for event in events:
-            if (event['kind'] in ('reminder', 'browser_share') or
+            if (event['kind'] in ('reminder', 'browser_share', 'bili_share') or
                     event['kind'] == 'followup' and event.get('origin') == 'wechat' or
                     event['kind'] == 'result' and event.get('proactive') and event.get('ok') and not event.get('silent')):
                 self.notifications.append((event.get('started', event.get('created', now)), event['text'], event.get('meme_id'), event.get('meme_generation'),
@@ -519,10 +533,13 @@ class WeChatChannel:
             stale = (now - n[0] > 3600 or n[5] in ('result', 'browser_share') and
                      n[0] < max(self.context_time, self.core.store.get('last_user_at', 0)) or
                      n[5] == 'browser_share' and not self.core.store.get('browser_sharing_enabled', True) or
+                     n[5] == 'bili_share' and (not self.core.bili.settings.share_wechat or not self.core.bili.settings.enabled) or
                      n[4] is not None and not (self.core.store.get('activity_followups', True) and activity
                      and activity['status'] == 'active' and activity['source_id'] == n[4]))
             if stale:
                 self.core.store.continuity.delivered(n[6], False)
+                if n[5] == 'bili_share':
+                    self.core.bili.share_result(n[6], 'cancelled')
                 if n[8]:
                     self.core.store.task(n[8], 'cancelled', '分享已过时或被关闭，没有发送')
             else:
@@ -531,6 +548,9 @@ class WeChatChannel:
         # Explicit user requests take precedence over unsolicited notifications.
         self.notifications = deque(sorted(self.notifications, key=lambda n: not n[7]), maxlen=20)
         requested = bool(self.notifications and self.notifications[0][7])
+        if (self.notifications and self.notifications[0][5] == 'bili_share'
+                and (self.core.handoff_requested or not s.online)):
+            return
         if (not self.notifications or not self.core.wechat_ready or s.dnd or
                 self.core.env.focused or not s.proactive or
                 not requested and (len(self.sent) >= s.proactive_per_hour or
@@ -546,8 +566,17 @@ class WeChatChannel:
         self.sent.append(now)
         self.core.store.put(self.key + ':sent', list(self.sent))
         _, text, meme_id, generation, _, kind, mid, _, request_id = self.notifications.popleft()
-        delivered = await self.send(self.context, text)
+        try:
+            delivered = await self.send(self.context, text)
+        except BaseException:
+            if kind == 'bili_share':
+                self.core.bili.share_result(mid, 'unconfirmed')
+                self.core.store.continuity.delivered(mid, False)
+            raise
         self.core.store.continuity.delivered(mid, delivered)
+        if kind == 'bili_share':
+            self.core.bili.share_result(mid, 'delivered' if delivered else 'unconfirmed')
+            self.core.store.audit('bili_share', 'delivered' if delivered else 'unconfirmed_no_retry')
         if delivered and kind == 'browser_share':
             self.core.store.remember('已向用户分享实际浏览的网页：' + text)
         if request_id:
@@ -559,6 +588,8 @@ class WeChatChannel:
     async def proactive(self):
         while True:
             await asyncio.sleep(1)
+            if self.core.handoff_requested:
+                continue
             await self.forward_events()
 
     async def run(self):
@@ -622,9 +653,11 @@ async def supervise(core, path):
                         await asyncio.gather(job, return_exceptions=True)
                     current, job = account, None
                     if account and account.enabled:
-                        job = asyncio.create_task(WeChatChannel(core, account).run())
+                        core.wechat_channel = WeChatChannel(core, account)
+                        job = asyncio.create_task(core.wechat_channel.run())
                         core.ilink_job = job
                     else:
+                        core.wechat_channel = None
                         core.wechat_state = 'disabled' if account else 'unbound'
                 if job and job.done():
                     # Wait for explicit rebind/change; never loop on an expired login.
@@ -702,6 +735,9 @@ def main():
     parser.add_argument('--account-file', type=Path,
                         default=Path(os.getenv('LITTLE_BLUE_DATA_DIR', 'data/core')) / 'wechat-account.json')
     args = parser.parse_args()
+    if args.command != 'status':
+        from .handoff_guard import require_active
+        require_active(args.account_file.parent)
     logging.basicConfig(level=logging.WARNING)
     logging.getLogger('httpx').setLevel(logging.WARNING)
     logging.getLogger('httpcore').setLevel(logging.WARNING)

@@ -1,4 +1,6 @@
 .venv/
+.python/
+.uv-tool/
 .uv-cache/
 __pycache__/
 .pytest_cache/
@@ -10,6 +12,10 @@ qa-output/
 build/
 dist/
 data/
+backups/
+.handoff/
+compose.override.yaml
+*.lbhand
 .env
 .env.*
 !.env.example

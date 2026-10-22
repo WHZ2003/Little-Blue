@@ -51,7 +51,7 @@ class BrowserRuntime:
 
     def busy(self):
         c = self.core
-        return (c.current is not None or c.wechat_receiving or c.env.interacting
+        return (c.current is not None or c.wechat_receiving or c.env.interacting or c.bili.active
                 or c.settings.dnd or c.env.focused or not c.settings.online)
 
     def eligible(self, now):

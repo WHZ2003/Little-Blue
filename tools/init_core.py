@@ -31,3 +31,12 @@ try:
     print('Created limited Windows bridge token (value hidden).')
 except FileExistsError:
     print('Keeping existing bridge token.')
+
+hermes_token = folder / 'hermes_token'
+try:
+    with hermes_token.open('x', encoding='utf-8') as stream:
+        stream.write(secrets.token_urlsafe(48))
+    hermes_token.chmod(0o600)
+    print('Created separate Hermes control token (value hidden).')
+except FileExistsError:
+    print('Keeping existing Hermes token.')

@@ -53,7 +53,7 @@ def create_app(store, token, client=None, wechat_path=None, bridge_token=None):
         # No browser origins/CORS: this is a native desktop API.
         if request.headers.get('Origin'):
             return web.json_response({'error': 'browser_origin_denied'}, status=403)
-        if request.path != '/healthz':
+        if request.path != '/healthz' and not request.path.startswith('/harness/'):
             supplied = request.headers.get('Authorization', '')
             expected = bridge_token if request.path == '/bridge' else token
             if not expected or not hmac.compare_digest(supplied.encode(), ('Bearer ' + expected).encode()):
@@ -74,6 +74,8 @@ def create_app(store, token, client=None, wechat_path=None, bridge_token=None):
 
     app = web.Application(middlewares=[boundary], client_max_size=128 * 1024)
     app[CORE_KEY] = core
+    from .hermes import install_routes
+    install_routes(app, core)
 
     async def health(request):
         alive = core.loop_task is not None and not core.loop_task.done()
@@ -84,6 +86,8 @@ def create_app(store, token, client=None, wechat_path=None, bridge_token=None):
 
     async def rpc(request):
         command = Command.model_validate(await request.json())
+        if core.handoff_requested and command.op not in ('sync', 'resolve', 'cancel', 'audit', 'disconnect'):
+            raise RuntimeError('Handoff in progress')
         if command.op == 'sync':
             if command.environment is None:
                 raise ValueError('missing environment')
@@ -167,6 +171,14 @@ def create_app(store, token, client=None, wechat_path=None, bridge_token=None):
     app.router.add_get('/healthz', health)
     app.router.add_get('/state', state)
     app.router.add_post('/rpc', rpc)
+    async def handoff(request):
+        if await request.json() != {'action': 'prepare'}:
+            raise ValueError('Invalid handoff operation')
+        return web.json_response(await core.prepare_handoff())
+    app.router.add_post('/handoff', handoff)
+    async def bili(request):
+        return web.json_response(await core.bili.control(await request.json()))
+    app.router.add_post('/bili', bili)
     from .bridge import Incoming, Strict
     class BridgeCommand(Strict):
         action: Literal['heartbeat', 'receive', 'pull', 'begin', 'ack']
@@ -179,6 +191,8 @@ def create_app(store, token, client=None, wechat_path=None, bridge_token=None):
         result: Literal['sent','failed','unknown'] = 'unknown'
 
     async def bridge_rpc(request):
+        if core.handoff_requested:
+            raise RuntimeError('Handoff in progress')
         cmd = BridgeCommand.model_validate(await request.json())
         hub = core.bridge
         if cmd.action == 'heartbeat':
@@ -201,6 +215,8 @@ def main():
     parser.add_argument('--data-dir', type=Path, default=Path(os.getenv('LITTLE_BLUE_DATA_DIR', 'data/core')))
     parser.add_argument('--token-file', type=Path, default=Path(os.getenv('LITTLE_BLUE_TOKEN_FILE', '.secrets/core_token')))
     args = parser.parse_args()
+    from .handoff_guard import require_active
+    require_active(args.data_dir)
     token = args.token_file.read_text(encoding='utf-8').strip()
     if len(token) < 32:
         parser.error('Generate a core token with tools/init_core.py first')

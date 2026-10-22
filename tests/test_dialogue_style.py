@@ -10,12 +10,47 @@ from little_blue.storage import Store
 from little_blue.tools import ToolRuntime
 
 
-def test_library_has_300_unique_short_replies_and_stable_ids():
+@pytest.mark.parametrize(('draft', 'expected'), [
+    ('那我讲个没用的想法：我觉得云像在天上排队。', '我觉得云像在天上排队。'),
+    ('那我随便说点？猫的眼神真的很嫌弃人。', '猫的眼神真的很嫌弃人。'),
+    ('行，那我说点正经的：这个视频的开头太长了。', '这个视频的开头太长了。'),
+    ('行行行。那我说个正经的——这个开头太长了。\n\n后面才有内容。', '这个开头太长了。\n\n后面才有内容。'),
+    ('白等了那么久确实烦，我陪着你。', '白等了那么久确实烦。'),
+    ('（挨着坐下）我听着。', '（挨着坐下）我听着。'),
+    ('我在这里陪着你。', '我在这里陪着你。'),
+    ('我听着呢，你继续。', '我听着呢，你继续。'),
+    ('那我讲个现实的问题：你希望保留哪份备份？', '那我讲个现实的问题：你希望保留哪份备份？'),
+    ('你说的“我陪着你”是什么意思？', '你说的“我陪着你”是什么意思？'),
+    ('先按这两步：\n1. 保存\n2. 退出', '先按这两步：\n1. 保存\n2. 退出'),
+    ('那我随便说点。', '那我随便说点。'),
+])
+def test_chat_cleanup_preserves_content_presence_quotes_and_instructions(draft, expected):
+    from little_blue.dialogue_style import clean_chat_reply
+    assert clean_chat_reply(draft) == expected
+
+
+async def test_cleaned_reply_is_the_only_pending_chat_record(tmp_path):
+    store = Store(tmp_path / 'clean.db')
+    store.growth.control('off')
+    class Client:
+        async def complete(self, messages, tools=None):
+            return {'content': '那我说点别的：猫半夜跑酷也太吵了。'}
+    try:
+        result = await Agent(store, Settings(online=True), None, Client()).run(
+            '说点别的呀', {}, chat_only=True)
+        assert result == '猫半夜跑酷也太吵了。'
+        row = store.continuity.recent()[-1]
+        assert row['text'] == result and row['delivery'] == 'pending'
+    finally:
+        store.close()
+
+
+def test_library_has_curated_short_replies_and_stable_ids():
     groups = catalog()
     examples = [e for g in groups for e in g['examples']]
-    assert len(groups) == 20 and len(examples) == 300
-    assert len({e['id'] for e in examples}) == 300
-    assert len({e['reply'] for e in examples}) == 300
+    assert len(groups) == 21 and len(examples) == 66
+    assert len({e['id'] for e in examples}) == len(examples)
+    assert len({e['reply'] for e in examples}) == len(examples)
     assert all('[[meme:' not in e['reply'] and '[[no_reply]]' not in e['reply'] for e in examples)
 
 
@@ -23,7 +58,7 @@ def test_library_has_300_unique_short_replies_and_stable_ids():
 def test_selection_is_bounded_and_does_not_repeat_recent_ids(text):
     first = select(text, {}, rng=random.Random(7))
     second = select(text, {}, [e['id'] for e in first], rng=random.Random(7))
-    assert 0 < len(first) <= 3 and 0 < len(second) <= 3
+    assert 0 < len(first) <= 2 and 0 < len(second) <= 2
     assert not {e['id'] for e in first} & {e['id'] for e in second}
 
 
@@ -42,6 +77,26 @@ def test_fragments_use_adjacent_user_context_and_proactive_respects_quiet():
     assert select('这条不用回复哦', {}) == []
     assert all(e['group'] in {'missing', 'daily', 'emotion', 'curiosity'}
                for e in select('想起今天的事', {}, proactive=True))
+
+
+def test_unmatched_input_does_not_inject_an_unrelated_daily_story():
+    assert select('嗯，收到', {}) == []
+    assert select('这次延迟是 320ms', {}) == []
+    assert select('主动聊一下', {}, proactive=True) == []
+
+
+def test_company_invitation_has_relevant_examples_and_respects_quiet():
+    for text in ('没什么，就是想听你说话', '你说点什么都行', '我们聊会儿'):
+        selected = select(text, {}, rng=random.Random(7))
+        assert selected and all(e['group'] == 'company' for e in selected)
+    assert select('不用回复，陪我待会儿', {}) == []
+    assert select('陪我待会儿，不想说话', {}) == []
+    assert all(e['group'] != 'company' for e in select('我好难受，陪我待会儿', {'avoid_teasing': True}))
+    for seed in range(20):
+        chosen = select('别一直说陪着我了，你倒是说点别的啊', {}, rng=random.Random(seed))
+        assert chosen and all(e['group'] == 'company' for e in chosen)
+        chosen = select('哈哈哈你怎么这么可爱', {}, rng=random.Random(seed))
+        assert chosen and all(e['group'] == 'affection' for e in chosen)
 
 
 def test_prompt_only_persists_ids_and_cannot_claim_examples_are_memories(tmp_path):

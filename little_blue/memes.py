@@ -53,16 +53,43 @@ class MemeCatalog:
             items.append(item)
         return items
 
-    def prompt(self):
+    def suggestions(self, text=None, avoid_teasing=False):
+        """Shortlist existing, verified assets for explicit conversational cues."""
+        available = self.available(automatic=True)
+        if text is None:
+            return available
+        if any(word in text for word in ('不用回', '不必回复', '别发表情', '不要发表情')):
+            return []
+        if avoid_teasing:
+            ids = {'909', '916', '906'}
+        else:
+            # Earlier groups win: an affectionate joke about eating the pet
+            # should not become a literal food recommendation.
+            groups = (
+                (('吃口你', '吃掉你', '啃你', '咬你', '尾巴'), {'905', '929', '936', '903'}),
+                (('摸摸', '抱抱', '亲亲', '贴贴', '可爱', '喜欢你'), {'909', '927', '929', '901'}),
+                (('好累', '累了', '累啊', '累死', '写累', '作业好多'), {'916', '938', '909'}),
+                (('饿', '吃饭', '夜宵', '零食'), {'939', '910', '123'}),
+                (('写完', '搞定', '成功', '考过'), {'902', '924', '925'}),
+                (('哈哈', '笑死', '好好笑'), {'922', '923', '087', '083'}),
+                (('晚安', '睡了', '睡觉了'), {'908'}),
+                (('早安', '早上好'), {'911', '907'}),
+                (('你好', '在吗'), {'907', '912'}),
+            )
+            ids = next((ids for words, ids in groups if any(w in text for w in words)), None)
+        return [i for i in available if ids is None or i['id'] in ids]
+
+    def prompt(self, text=None, *, avoid_teasing=False):
         choices = [{'id': i['id'], 'caption': i['title'], 'context': i['auto_context']}
-                   for i in self.available(automatic=True)]
+                   for i in self.suggestions(text, avoid_teasing)]
         if not choices:
             return ''
-        return ('表情是日常聊天的自然表达，不必等用户提醒，也不必等到有强烈情绪或重要事件才发。'
-                '想笑、撒娇、抱抱、惦记、得意、无语或一起吐槽时，都可以随手选一张；聊得来时连续几轮配图也可以。'
+        return ('用户明确希望你多发表情包。日常闲聊默认采用“一句自然的话＋一张贴合语气的表情”，多数闲聊轮次都配图。'
+                '问候、普通接话、撒娇、打趣、吐槽、开心或道别都适合，不必等强烈情绪，也不必等用户再次提醒。'
+                '先从候选里选表达这句回复态度的图；连续几轮配图、再次用同一张都可以，不因上一轮发过就省略。'
+                '用图代替多余的动作描写、追问或叮嘱，不为发图编造情绪、经历或另起话题。'
                 '在回复末尾附加一个 [[meme:编号]] 标记，系统会尝试发送图片；一句短话加图就够，不要再解释图片。'
-                '例如确有好成绩时说‘让我得意一下’并配得意图；用户说‘终于写完了’可配庆祝图。'
-                '这些仅是表达示例，不能据此编造成绩或经历。普通接话也可以不加，不为发图硬找话题。'
+                '只有这轮没有贴切的图、用户要求纯文字，或严肃说明会被配图打断时才省略。认真求助先把问题答清楚。'
                 '当前没有每小时张数配额，历史记忆中的1分钟8张属于旧规则；发送层只保留短间隔防刷屏保护。'
                 '难过时可以选温柔的抱抱或安慰图，不拿真实痛苦、严肃求助、健康或紧急话题开玩笑；'
                 '先不用回复或决定保持沉默时不发图。'

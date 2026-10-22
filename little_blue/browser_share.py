@@ -18,7 +18,7 @@ class BrowserShare:
         c = self.core
         return (c.settings.online and c.settings.proactive and c.wechat_ready
                 and not c.settings.dnd and not c.env.focused and not c.env.interacting
-                and not c.current and not c.wechat_receiving
+                and not c.current and not c.wechat_receiving and not c.bili.active
                 and c.store.get('browser_sharing_enabled', True))
 
     async def request_once(self):
@@ -62,7 +62,7 @@ class BrowserShare:
             return False
         seen = s.get('browser_share_seen', [])
         attempts = [t for t in s.get('browser_share_attempts', []) if now-t < 86400]
-        return (c.settings.online and c.wechat_ready and not c.current and not c.wechat_receiving
+        return (c.settings.online and c.wechat_ready and not c.current and not c.wechat_receiving and not c.bili.active
                 and not c.env.interacting and c.gate.available(now, c.settings, c.env)
                 and 0 <= now-page['observed_at'] <= 3600 and page['url'] not in seen
                 and len(attempts) < 2 and (not attempts or now-attempts[-1] >= 7200))

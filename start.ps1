@@ -3,6 +3,10 @@ $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $petPython = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 if (!(Test-Path -LiteralPath $petPython)) { $petPython = 'python' }
+if (!$LocalOnly) {
+    & $petPython -m little_blue.handoff check
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 $petArgs = @('-m', 'little_blue')
 if ($Panel) { $petArgs += '--panel' }
 if ($DebugMode) { $petArgs += '--debug' }
