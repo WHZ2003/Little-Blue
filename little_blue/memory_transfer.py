@@ -17,7 +17,7 @@ FORMAT = 'little-blue-memory'
 VERSION = 2
 MAX_BYTES = 1024 * 1024 * 1024
 MAX_FILES = 612
-COUNTS = ('memories', 'conversation', 'growth_versions', 'memory_changes', 'reminders')
+COUNTS = ('memories', 'conversation', 'growth_versions', 'memory_changes', 'reminders', 'diaries')
 
 
 def database_name(name):
@@ -246,6 +246,8 @@ def prepare_restored_database(path):
         db.execute("UPDATE tasks SET status='interrupted' WHERE status IN ('pending','running','approval')")
         if 'reminders' in tables:
             db.execute('UPDATE reminders SET delivered=1 WHERE delivered=0')
+        if 'diary_attempts' in tables:
+            db.execute("UPDATE diary_attempts SET status='interrupted' WHERE status='running'")
         if 'conversation_inbox' in tables:
             db.execute("UPDATE conversation_inbox SET state='interrupted' WHERE state IN ('received','processing')")
         if 'bridge_inbox' in tables:

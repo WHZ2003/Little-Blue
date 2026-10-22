@@ -414,6 +414,22 @@ class WeChatChannel:
     async def consume_one(self, item):
         text, context, mid = item
         generation = self.cancel_generation
+        from .diary import parse_command
+        diary_command = parse_command(text)
+        if diary_command:
+            try:
+                reply = await self.core.diary.command(*diary_command)
+            except (ValueError, RuntimeError) as error:
+                reply = str(error)
+            except asyncio.CancelledError:
+                raise
+            if generation == self.cancel_generation:
+                delivered = await self.send(context, reply)
+                self.core.store.continuity.inbox_state([mid], 'answered' if delivered else 'failed')
+            return
+        # A private background diary yields to an actual conversation.
+        if self.core.current and self.core.current.get('diary'):
+            await self.core.cancel()
         if text in ('/bili sharing on', '/bili sharing off'):
             config = self.core.bili.settings.model_dump()
             config['share_wechat'] = text.endswith(' on')

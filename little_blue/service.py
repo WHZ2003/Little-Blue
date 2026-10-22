@@ -179,6 +179,25 @@ def create_app(store, token, client=None, wechat_path=None, bridge_token=None):
     async def bili(request):
         return web.json_response(await core.bili.control(await request.json()))
     app.router.add_post('/bili', bili)
+    class DiaryCommand(Model):
+        action: Literal['status', 'list', 'read', 'write', 'on', 'off'] = 'status'
+        day: str | None = Field(None, pattern=r'^\d{4}-\d{2}-\d{2}$')
+
+    async def diary(request):
+        cmd = DiaryCommand.model_validate(await request.json())
+        if cmd.action in ('write', 'on', 'off') and core.handoff_requested:
+            raise RuntimeError('Handoff in progress')
+        if cmd.action == 'write':
+            ident = core.diary.start(cmd.day)
+            return web.json_response({'task_id': ident, 'entry': None if ident else core.diary.read(cmd.day or core.diary.today())})
+        if cmd.action == 'read':
+            return web.json_response({'entry': core.diary.read(cmd.day)})
+        if cmd.action == 'list':
+            return web.json_response({'entries': core.diary.rows('SELECT day,updated FROM diaries ORDER BY day DESC LIMIT 30')})
+        if cmd.action in ('on', 'off'):
+            await core.diary.command(cmd.action)
+        return web.json_response(core.diary.status())
+    app.router.add_post('/diary', diary)
     from .bridge import Incoming, Strict
     class BridgeCommand(Strict):
         action: Literal['heartbeat', 'receive', 'pull', 'begin', 'ack']

@@ -96,6 +96,8 @@ class Core:
         self.bridge = BridgeHub(self)
         from .bili import BiliRuntime
         self.bili = BiliRuntime(self)
+        from .diary import Diary
+        self.diary = Diary(self)
 
     @property
     def host_connected(self):
@@ -134,6 +136,7 @@ class Core:
                 'phone': self.phone.snapshot(),
                 'browser': self.browser.snapshot(), 'bridge': self.bridge.snapshot(),
                 'bili': self.bili.snapshot(),
+                'diary': self.diary.status(),
                 'settings': self.settings.model_dump(),
                 'life': {'needs': self.life.needs.model_dump(),
                          'emotion': self.life.emotion.model_dump(),
@@ -313,6 +316,7 @@ class Core:
             if before != self.life.goal:
                 self.store.working.append(f'自主目标：{self.life.goal}')
             wall = time.time()
+            self.diary.tick(wall)
             self.bridge.tick()
             idle = self.env.idle_seconds
             if idle is not None:
