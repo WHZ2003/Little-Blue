@@ -16,6 +16,7 @@ class Action(StrEnum):
     ANGRY = "angry"
     TALK = "talk"
     DRAG = "drag"
+    FEED = "feed"
 
 
 class Needs(Model):

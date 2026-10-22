@@ -35,6 +35,16 @@ async def test_remote_desktop_chat_memory_host_approval_and_disconnect(tmp_path)
                          Path(__file__).parents[1] / 'assets', tmp_path)
     try:
         await pump(app, lambda: c.connected)
+        from little_blue.models import Action
+        c.interact('feed')
+        await pump(app, lambda: core.life.action == Action.FEED)
+        c.pet.frame()
+        assert c.pet.anim_action == Action.FEED
+        first_end = c.pet.feed_until
+        c.interact('feed')
+        assert c.pet.feed_until == first_end
+        await pump(app, lambda: core.life.action != Action.FEED, timeout=5)
+        await pump(app, lambda: c.pet.anim_action != Action.FEED)
         assert not c.panel.isVisible()
         c.show_identity()
         await pump(app, lambda: c.identity_dialog.snapshot is not None)

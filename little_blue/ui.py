@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QDialog, QFileDialog, QF
     QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QMenu, QMessageBox, QProgressBar,
     QPushButton, QSpinBox, QSystemTrayIcon, QTabWidget, QTextEdit, QVBoxLayout, QWidget)
 from .cognition import ProactiveGate
-from .life import Body, Life
+from .life import Body, Life, FEED_DURATION
 from .models import Action, Emotion, Needs, Settings
 from .perception import perceive
 from .sprites import SpriteBank
@@ -21,7 +21,7 @@ from .phone_ui import PhoneDialog
 
 LOG = logging.getLogger(__name__)
 LABELS = {"energy": "精力", "boredom": "无聊", "curiosity": "好奇", "social": "社交需求", "mood": "心情", "trust": "亲密度"}
-ACTION_NAMES = {"idle": "发呆", "walk": "散步", "run": "奔跑", "jump": "跳跃", "sleep": "睡觉", "happy": "开心", "angry": "生气", "talk": "说话", "drag": "拖动"}
+ACTION_NAMES = {"idle": "发呆", "walk": "散步", "run": "奔跑", "jump": "跳跃", "sleep": "睡觉", "happy": "开心", "angry": "生气", "talk": "说话", "drag": "拖动", "feed": "吃点心"}
 EMOTION_NAMES = {"happy": "开心", "calm": "平静", "curious": "好奇", "sleepy": "困倦", "angry": "不高兴", "surprised": "惊讶"}
 GOAL_NAMES = {"settle": "适应桌面", "rest": "休息", "explore": "探索", "play": "玩耍", "stroll": "散步", "observe": "观察"}
 WECHAT_NAMES = {'unbound': '未绑定', 'disabled': '已关闭', 'connecting': '连接中',
@@ -73,6 +73,7 @@ class PetWindow(QWidget):
         self.anim_action = Action.IDLE
         self.anim_elapsed = 0.0
         self.talk_until = 0
+        self.feed_until = 0
         self.last = time.monotonic()
         self.reset_position()
         self.timer = QTimer(self)
@@ -92,11 +93,22 @@ class PetWindow(QWidget):
         self.body.vy = 0
         self.move(round(self.body.x), round(self.body.y))
 
+    def start_feed(self):
+        # Keep the local clip continuous while an older remote snapshot arrives.
+        self.feed_until = time.monotonic() + FEED_DURATION
+        self.anim_action, self.anim_elapsed = Action.FEED, 0.0
+        self.last = time.monotonic()
+        self.update()
+
     def frame(self):
         now = time.monotonic()
         dt, self.last = min(.05, now - self.last), now
         action = self.life.action
-        if now < self.talk_until and action not in (Action.DRAG, Action.SLEEP):
+        if self.dragging or action == Action.DRAG:
+            self.feed_until = 0
+        elif now < self.feed_until:
+            action = Action.FEED
+        if now < self.talk_until and action not in (Action.DRAG, Action.SLEEP, Action.FEED):
             action = Action.TALK
         # The body and renderer must use the same action: a talking/standing
         # sprite must not continue translating with a hidden walking command.
@@ -127,7 +139,7 @@ class PetWindow(QWidget):
             painter.translate(self.width(), 0)
             painter.scale(-1, 1)
         painter.drawPixmap((self.width() - pix.width()) // 2, self.height() - pix.height(), pix)
-        if self.life.phone_active:
+        if self.life.phone_active and self.anim_action != Action.FEED:
             painter.resetTransform()
             painter.setPen(QColor('#cee8fc'))
             painter.setBrush(QColor('#294868'))
@@ -177,6 +189,7 @@ class PetWindow(QWidget):
         menu.addAction("记忆与依据…", self.open_memory.emit)
         menu.addAction("DeepSeek控制台", self.open_panel.emit)
         menu.addAction("摸摸头", lambda: self.interaction.emit("pet"))
+        menu.addAction("喂食 · 小饼干", lambda: self.interaction.emit("feed"))
         menu.addAction("跳一跳", lambda: self.interaction.emit("click"))
         menu.addAction("回到屏幕", self.reset_position)
         menu.addSeparator()
@@ -326,7 +339,7 @@ class Panel(QWidget):
             form.addRow(name, bar)
         layout.addLayout(form)
         row = QHBoxLayout()
-        for name, kind in [("摸摸头", "pet"), ("跳一跳", "click")]:
+        for name, kind in [("摸摸头", "pet"), ("喂食", "feed"), ("跳一跳", "click")]:
             b = QPushButton(name)
             b.clicked.connect(lambda checked=False, k=kind: self.c.interact(k))
             row.addWidget(b)
@@ -575,6 +588,7 @@ class Controller:
         self.tray = QSystemTrayIcon(QIcon(sprites.frame(Action.IDLE, 0)), app)
         menu = QMenu()
         menu.addAction("聊聊天", self.chat_bubble.toggle)
+        menu.addAction("喂食 · 小饼干", lambda: self.interact('feed'))
         menu.addAction("她的手机…", self.show_phone)
         menu.addAction("她的浏览器…", self.show_browser)
         menu.addAction("打开控制台", self.show_panel)
@@ -656,7 +670,9 @@ class Controller:
         self.save()
 
     def interact(self, kind):
-        self.life.interact(kind)
+        accepted = self.life.interact(kind)
+        if kind == 'feed' and accepted:
+            self.pet.start_feed()
         if kind == "pet":
             now = time.monotonic()
             if now - getattr(self, "last_pet_memory", -100) > 20:

@@ -428,7 +428,11 @@ class RemoteController(Controller):
 
     def interact(self, kind):
         # Immediate local reaction hides the poll interval; core remains authoritative.
-        self.life.interact(kind)
+        accepted = self.life.interact(kind)
+        if kind == 'feed':
+            if not accepted:
+                return
+            self.pet.start_feed()
         if self.connected:
             self.worker.send('interact', interaction=kind)
 

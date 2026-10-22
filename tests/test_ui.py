@@ -21,9 +21,61 @@ def app():
 def test_sprite_all_actions_and_animation_frames(app):
     bank = SpriteBank(Path(__file__).parents[1] / 'assets/blue/manifest.json')
     for action in Action:
-        assert len(bank.clips[action].frames) == (8 if action == Action.WALK else 4)
+        assert len(bank.clips[action].frames) == ({Action.WALK: 8, Action.FEED: 16}.get(action, 4))
         assert not bank.frame(action, .2).isNull()
     assert bank.frame(Action.IDLE, 0).cacheKey() != bank.frame(Action.IDLE, .5).cacheKey()
+
+
+def test_feed_clip_stays_continuous_through_talk_and_stale_state(app, monkeypatch):
+    from little_blue.life import Life, FEED_DURATION
+    from little_blue.models import Settings
+    from little_blue.ui import PetWindow
+    bank = SpriteBank(Path(__file__).parents[1] / 'assets/blue/manifest.json')
+    pet = PetWindow(Life(), Settings(follow_mouse=True, perception=True), bank)
+    pet.timer.stop()
+    clock = [100.0]
+    monkeypatch.setattr('little_blue.ui.time.monotonic', lambda: clock[0])
+    try:
+        pet.body.x = 100
+        pet.body.y = pet.bounds()[3] - pet.height()
+        pet.talk_until = 110
+        pet.start_feed()
+        pet.life.override = Action.WALK  # A snapshot from before the feed RPC.
+        pet.life.override_until = float('inf')
+        for _ in range(20):
+            clock[0] += .025
+            pet.frame()
+        assert pet.anim_action == Action.FEED
+        assert pet.anim_elapsed == pytest.approx(.5)
+        assert pet.body.x == 100
+        clip = bank.clips['feed']
+        assert not clip.loop and len(clip.frames) / clip.fps == FEED_DURATION
+        assert bank.frame(Action.FEED, 100).cacheKey() == clip.frames[-1].cacheKey()
+        clock[0] += FEED_DURATION
+        pet.frame()
+        assert pet.anim_action == Action.TALK
+        pet.start_feed()
+        pet.dragging = True
+        pet.frame()
+        assert pet.anim_action == Action.DRAG and pet.feed_until == 0
+    finally:
+        pet.close()
+
+
+def test_feed_frames_have_transparent_margins_and_aligned_feet(app):
+    bank = SpriteBank(Path(__file__).parents[1] / 'assets/blue/manifest.json', size=180)
+    baselines = []
+    for pixmap in bank.clips['feed'].frames:
+        image = pixmap.toImage()
+        assert image.hasAlphaChannel()
+        points = [(x, y) for y in range(image.height()) for x in range(image.width())
+                  if image.pixelColor(x, y).alpha() > 180]
+        assert points
+        xs, ys = zip(*points)
+        assert min(xs) > 1 and max(xs) < image.width() - 2
+        assert min(ys) > 1 and max(ys) < image.height() - 2
+        baselines.append(max(ys) + 180 - image.height())
+    assert max(baselines) - min(baselines) <= 2
 
 
 def test_missing_idle_and_path_escape_rejected(app, tmp_path):

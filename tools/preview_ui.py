@@ -30,7 +30,7 @@ def capture():
     conversation.append('assistant', '好，接着答辩的开场聊。先用一个具体的问题引出主题怎么样？', 'wechat')
     c.chat_bubble.toggle()
     c.chat_bubble.grab().save(str(out / 'chat.png'))
-    sheet = QPixmap(9 * 180, 210)
+    sheet = QPixmap(len(Action) * 180, 210)
     sheet.fill(QColor('#e6efff'))
     painter = QPainter(sheet)
     painter.setPen(QColor('#15233b'))

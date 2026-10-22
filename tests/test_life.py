@@ -67,6 +67,34 @@ def test_pet_interaction_changes_trust_and_social():
     assert pet.action == Action.HAPPY
 
 
+def test_feeding_has_bounded_reward_no_repeat_and_returns_to_idle():
+    from little_blue.life import FEED_DURATION, FEED_COOLDOWN
+    pet = Life(Needs(energy=96), seed=3)
+    before = pet.needs.model_copy()
+    assert pet.interact('feed')
+    assert pet.action == Action.FEED and pet.needs.energy == 100
+    assert pet.needs.mood > before.mood and pet.needs.trust > before.trust
+    fed = pet.needs.model_dump()
+    assert pet.interact('feed') is False
+    assert pet.interact('click') is False
+    assert pet.needs.model_dump() == fed
+    for _ in range(round(FEED_DURATION * 10) + 1):
+        pet.tick(.1, Environment(focused=True))
+    assert pet.action == Action.IDLE
+    assert pet.interact('feed') is False
+    for _ in range(round(FEED_COOLDOWN * 10)):
+        pet.tick(.1, Environment())
+    assert pet.interact('feed')
+    pet.interact('drag')
+    assert pet.action == Action.DRAG and not pet.interact('feed')
+
+
+def test_feeding_does_not_walk_toward_cursor():
+    body = Body(x=100, y=420)
+    body.tick(.05, Action.FEED, (0, 0, 800, 600), 180, 1, target_x=600)
+    assert body.x == 100 and body.y == 420
+
+
 def test_physics_respects_negative_monitor_origin_and_lands():
     body = Body(x=-1910, y=300)
     for _ in range(500):

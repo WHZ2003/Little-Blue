@@ -48,6 +48,21 @@ async def test_auth_origin_and_schema_boundary(api):
     assert 'NEVER_ECHO' not in await response.text()
 
 
+async def test_feed_requires_desktop_host_and_never_calls_model(api):
+    from little_blue.models import Action
+    client, core = api
+    assert (await rpc(client, 'interact', interaction='feed'))[0].status == 403
+    await claim(client)
+    budget = core.store.budget_usage()
+    before = core.life.needs.energy
+    assert (await rpc(client, 'interact', interaction='feed'))[0].status == 200
+    assert core.life.action == Action.FEED and core.life.needs.energy > before
+    after = core.life.needs.energy
+    assert (await rpc(client, 'interact', interaction='feed'))[0].status == 200
+    assert core.life.needs.energy <= after
+    assert core.store.budget_usage() == budget and core.current is None
+
+
 async def test_identity_control_requires_host_and_rejects_core_edits(api):
     client, core = api
     assert (await rpc(client, 'identity'))[0].status == 403

@@ -25,7 +25,7 @@ class Command(Model):
     after: int = Field(0, ge=0)
     environment: Environment | None = None
     settings: Settings | None = None
-    interaction: Literal['pet', 'click', 'drag', 'release'] | None = None
+    interaction: Literal['pet', 'click', 'drag', 'release', 'feed'] | None = None
     direction: Literal[-1, 1] | None = None
     text: str = Field('', max_length=4000)
     task_id: str = Field('', max_length=64, pattern=r'^[a-f0-9]*$')

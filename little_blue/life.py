@@ -4,6 +4,9 @@ import random
 from dataclasses import dataclass
 from .models import Action, Needs, Emotion, Personality, Environment
 
+FEED_DURATION = 3.2
+FEED_COOLDOWN = 10.0
+
 
 @dataclass
 class TimedAction:
@@ -52,6 +55,7 @@ class Life:
         self.last_interaction = -100.0
         self.drag_started = 0
         self.phone_active = False
+        self.feed_after = 0.0
 
     @property
     def action(self):
@@ -62,10 +66,21 @@ class Life:
         return self.tree.action
 
     def interact(self, kind):
+        if kind == 'feed':
+            if self.elapsed < self.feed_after or self.action == Action.DRAG:
+                return False
+            self.feed_after = self.elapsed + FEED_COOLDOWN
+            self.needs.change('energy', 8)
+            self.needs.change('mood', 4)
+            self.needs.change('social', -6)
+            self.needs.change('trust', .3)
+            self.override, self.override_until = Action.FEED, self.elapsed + FEED_DURATION
+            self.settle(30, 60)
+            return True
         if kind == "drag":
             self.drag_started = self.elapsed
             self.override, self.override_until = Action.DRAG, float("inf")
-            return
+            return True
         if kind == "release":
             long_drag = self.elapsed - self.drag_started > 8
             self.override = Action.ANGRY if long_drag else Action.IDLE
@@ -73,9 +88,11 @@ class Life:
             if long_drag:
                 self.needs.change("mood", -12)
             self.settle(60, 120)
-            return
+            return True
+        if self.action == Action.FEED:
+            return False
         if self.elapsed - self.last_interaction < .6:
-            return
+            return False
         self.last_interaction = self.elapsed
         self.needs.change("social", -12)
         self.needs.change("trust", .6 if kind == "pet" else .2)
@@ -84,6 +101,7 @@ class Life:
         self.override = Action.HAPPY if kind == "pet" else Action.JUMP
         self.override_until = self.elapsed + 2
         self.settle(30, 60)
+        return True
 
     def settle(self, duration, roam_delay):
         """Keep the position the user chose; explicit reactions still play."""
