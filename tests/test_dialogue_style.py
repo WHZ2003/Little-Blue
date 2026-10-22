@@ -48,7 +48,7 @@ async def test_cleaned_reply_is_the_only_pending_chat_record(tmp_path):
 def test_library_has_curated_short_replies_and_stable_ids():
     groups = catalog()
     examples = [e for g in groups for e in g['examples']]
-    assert len(groups) == 21 and len(examples) == 66
+    assert len(groups) == 21 and len(examples) == 78
     assert len({e['id'] for e in examples}) == len(examples)
     assert len({e['reply'] for e in examples}) == len(examples)
     assert all('[[meme:' not in e['reply'] and '[[no_reply]]' not in e['reply'] for e in examples)
@@ -83,6 +83,13 @@ def test_unmatched_input_does_not_inject_an_unrelated_daily_story():
     assert select('嗯，收到', {}) == []
     assert select('这次延迟是 320ms', {}) == []
     assert select('主动聊一下', {}, proactive=True) == []
+
+
+def test_request_for_closeness_selects_affection_but_respects_boundaries():
+    for text in ('你可以主动一点嘛', '想跟你亲近一点'):
+        chosen = select(text, {}, rng=random.Random(7))
+        assert chosen and all(e['group'] == 'affection' for e in chosen)
+    assert all(e['group'] != 'affection' for e in select('别撒娇，主动一点解释代码', {}))
 
 
 def test_company_invitation_has_relevant_examples_and_respects_quiet():

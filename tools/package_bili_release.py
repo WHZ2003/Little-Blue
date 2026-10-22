@@ -15,7 +15,7 @@ def main():
     folder = ROOT / '.research/bili-release'
     folder.mkdir(exist_ok=True)
     config = configuration()
-    config['services']['core']['image'] = 'little-blue-core:feed-v1'
+    config['services']['core']['image'] = 'little-blue-core:romance-v3'
     config['services']['hermes']['image'] = 'dafeiyu-hermes:style-v1'
     (folder / 'compose.yaml').write_text(yaml.safe_dump(config,sort_keys=False))
     canary = copy.deepcopy(config)
