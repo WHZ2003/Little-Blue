@@ -25,3 +25,14 @@ assets/user/
 assets/memes/community/
 assets/memes/generated/originals/
 models/
+firefly-voice/.venv/
+firefly-voice/python/
+firefly-voice/seed-vc/
+firefly-voice/downloads/
+firefly-voice/download-tools/
+firefly-voice/data/
+firefly-voice/models/
+firefly-voice/cache/
+firefly-voice/logs/
+firefly-voice/samples/
+firefly-voice/runtime/

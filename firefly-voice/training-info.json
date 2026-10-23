@@ -1,0 +1,116 @@
+{
+  "name": "firefly-zh-v1",
+  "seedVcCommit": "51383efd921027683c89e5348211d93ff12ac2a8",
+  "steps": 1000,
+  "batchSize": 1,
+  "sampleRate": 22050,
+  "gpu": "NVIDIA GeForce RTX 4070",
+  "dataset": {
+    "train-v1": {
+      "clips": 949,
+      "minutes": 86.09981783824647
+    },
+    "validation-v1": {
+      "clips": 107,
+      "minutes": 10.073670445956163
+    },
+    "reference": {
+      "clips": 1,
+      "minutes": 0.1517037037037037
+    }
+  },
+  "checkpointSha256": "E3E041B3F7F055F011393EF2BFC16F19D34C68A73EE5508AD58D02BB2F7DC996",
+  "evaluation": {
+    "samples": [
+      {
+        "mode": "trained",
+        "file": "samples\\trained-1.wav",
+        "expected": "我在呢，你忙完了就过来聊会儿。",
+        "duration": 3.2624036281179136,
+        "peak": 0.58984375,
+        "rms": 0.11800160259008408,
+        "speaker_cosine": 0.91270911693573,
+        "conversion_seconds": 0.845,
+        "transcript": "我在呢,你忙完了就過來聊會兒",
+        "character_error_rate": 0.0,
+        "normalization": "t2s, punctuation removed"
+      },
+      {
+        "mode": "trained",
+        "file": "samples\\trained-2.wav",
+        "expected": "怎么又熬夜了，快去睡吧。",
+        "duration": 2.972154195011338,
+        "peak": 0.61761474609375,
+        "rms": 0.11393262445926666,
+        "speaker_cosine": 0.9068360924720764,
+        "conversion_seconds": 0.695,
+        "transcript": "怎麼又熬夜了?快去睡吧",
+        "character_error_rate": 0.0,
+        "normalization": "t2s, punctuation removed"
+      },
+      {
+        "mode": "trained",
+        "file": "samples\\trained-3.wav",
+        "expected": "这个视频也太有意思了，想发给你看看。",
+        "duration": 3.959002267573696,
+        "peak": 0.757598876953125,
+        "rms": 0.1199343279004097,
+        "speaker_cosine": 0.9274156093597412,
+        "conversion_seconds": 0.863,
+        "transcript": "這個視頻也太有意思了,想發給你看看",
+        "character_error_rate": 0.0,
+        "normalization": "t2s, punctuation removed"
+      },
+      {
+        "mode": "pretrained",
+        "file": "samples\\pretrained-1.wav",
+        "expected": "我在呢，你忙完了就过来聊会儿。",
+        "duration": 3.2624036281179136,
+        "peak": 0.622711181640625,
+        "rms": 0.13094879686832428,
+        "speaker_cosine": 0.8934980034828186,
+        "conversion_seconds": 0.604,
+        "transcript": "我在呢,你忙忙了就過來聊會兒",
+        "character_error_rate": 0.07692307692307693,
+        "normalization": "t2s, punctuation removed"
+      },
+      {
+        "mode": "pretrained",
+        "file": "samples\\pretrained-2.wav",
+        "expected": "怎么又熬夜了，快去睡吧。",
+        "duration": 2.972154195011338,
+        "peak": 0.750152587890625,
+        "rms": 0.1173812597990036,
+        "speaker_cosine": 0.9123243093490601,
+        "conversion_seconds": 0.584,
+        "transcript": "怎麼又熬夜了?快去睡吧。",
+        "character_error_rate": 0.0,
+        "normalization": "t2s, punctuation removed"
+      },
+      {
+        "mode": "pretrained",
+        "file": "samples\\pretrained-3.wav",
+        "expected": "这个视频也太有意思了，想发给你看看。",
+        "duration": 3.959002267573696,
+        "peak": 0.63531494140625,
+        "rms": 0.12784714996814728,
+        "speaker_cosine": 0.9332255125045776,
+        "conversion_seconds": 0.622,
+        "transcript": "這個視頻也太有意思了,想發給你看看",
+        "character_error_rate": 0.0,
+        "normalization": "t2s, punctuation removed"
+      }
+    ],
+    "reference_seconds": 9.12204081632653
+  },
+  "verification": {
+    "success": true,
+    "pipeline": "installed Fatfish Speaker → existing Edge TTS → trained Seed-VC → WAV playback input",
+    "osPlaybackMutedForVerification": true,
+    "elapsedSeconds": 13.9562827,
+    "file": "D:\\DaFeiYu\\firefly-voice\\samples\\fatfish-integrated.wav",
+    "logs": [
+      "fatfish voice: Seed-VC firefly-zh-v1 converted"
+    ]
+  }
+}
