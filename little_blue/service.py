@@ -72,10 +72,12 @@ def create_app(store, token, client=None, wechat_path=None, bridge_token=None):
             logging.getLogger(__name__).error('Core request failed: %s', type(error).__name__)
             return web.json_response({'error': 'internal_error'}, status=500)
 
-    app = web.Application(middlewares=[boundary], client_max_size=128 * 1024)
+    app = web.Application(middlewares=[boundary], client_max_size=1024 * 1024)
     app[CORE_KEY] = core
     from .hermes import install_routes
     install_routes(app, core)
+    from .companion import install_routes as install_companion_routes
+    install_companion_routes(app, core)
 
     async def health(request):
         alive = core.loop_task is not None and not core.loop_task.done()

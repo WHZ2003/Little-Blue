@@ -191,6 +191,7 @@ class Core:
     async def configure(self, raw):
         updated = Settings.model_validate(raw)
         revoke = ((self.settings.online and not updated.online) or
+                  (self.settings.research_enabled and not updated.research_enabled) or
                   (self.settings.tools_enabled and not updated.tools_enabled))
         quiet = self.current and self.current['proactive'] and (updated.dnd or not updated.proactive)
         # Keep shared Settings identity for Agent and ToolRuntime.
@@ -347,7 +348,7 @@ class Core:
                     pass
                 elif self.gate.eligible(wall, self.settings, self.env, self.life.needs):
                     self.gate.claim(wall)
-                    self.submit('根据状态和记忆简短主动交流，不调用工具。', proactive=True,
+                    self.submit('根据状态和记忆简短主动交流；有具体公开话题需要查证时可使用获准的资料工具。', proactive=True,
                                 origin='desktop' if self.host_connected else 'wechat')
                 elif self.settings.online and wall - self.last_reflection > 21600 and not self.env.interacting:
                     self.last_reflection = wall

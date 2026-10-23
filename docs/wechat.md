@@ -1,10 +1,12 @@
-# DeepSeek 的微信文字通道
+# DeepSeek 的微信聊天通道
 
-已支持发送图片表情：`/memes` 查看，`/meme 087` 点发，`/memes off` 关闭自动配图；见 [表情包说明](memes.md)。接收端仍只解析文字，不读取用户发送的图片或语音。
+已支持发送图片表情：`/memes` 查看，`/meme 087` 点发，`/memes off` 关闭自动配图；见 [表情包说明](memes.md)。接收端支持文字和图片；语音和文件仍未接入。
+
+微信图片通过白名单 CDN 下载、AES 解密，再用现有 `deepseek-flash` 识别（[官方视觉文档](https://api-docs.deepseek.com/guides/vision/)）。识别摘要带明确标注写入这条来信，随后交给原有聊天流程，保留人设、记忆和短消息规则。每条来信最多三张图、每张下载最多 8 MiB／2000 万像素；识别前缩至最长边 1600 像素并去除元数据，只读取动图第一帧。图片与解密凭据只在内存中处理，不保存原文件。每条含图来信增加一次有预算约束的识别调用；内联图片按每张 4096 token 保守预留，成功后以实际用量结算，不把 base64 字节误算为文字 token。失败不猜图、不自动重发；取消会中止正在进行的识别。
 
 身份成长控制：发送 `/identity` 查看两层身份卡，`/identity 版本号` 查看引用的记忆依据，`/growth off` 或 `/growth on` 关闭／开启自动成长，`/growth undo` 撤销最近更新。命令不调用模型，也不作为学习来源；关闭保留已有设定。详见 [角色身份](character.md)。
 
-通过腾讯 ClawBot / iLink 接入个人微信，收发代码运行在现有 Docker 核心中。使用当前核心的 Agent、需求状态、预算和 SQLite 记忆，不运行第二套 OpenClaw。当前支持文字私聊、状态查询、取消微信任务以及受限的主动通知；图片、语音、文件和群聊尚未接入。
+通过腾讯 ClawBot / iLink 接入个人微信，收发代码运行在现有 Docker 核心中。使用当前核心的 Agent、需求状态、预算和 SQLite 记忆，不运行第二套 OpenClaw。当前支持文字和图片私聊、状态查询、取消微信任务以及受限的主动通知；语音、文件和群聊尚未接入。
 
 协议依据：腾讯 [openclaw-weixin 协议文档](https://github.com/Tencent/openclaw-weixin/blob/main/docs/protocol.md)、[扫码流程](https://github.com/Tencent/openclaw-weixin/blob/main/src/auth/login-qr.ts)及[文本消息实现](https://github.com/Tencent/openclaw-weixin/blob/main/src/messaging/send.ts)。这是独立 Python 实现，没有复制或安装上游插件。客户端协议不代表服务器保证，账号是否可绑定以及主动消息是否能送达需实测。
 

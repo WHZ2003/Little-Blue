@@ -225,7 +225,7 @@ def prepare_restored_database(path):
         settings = json.loads(row[0]) if row else {}
         if not isinstance(settings, dict):
             raise ValueError('Invalid saved settings')
-        settings.update(online=False, tools_enabled=False, perception=False, sprite_manifest='')
+        settings.update(online=False, tools_enabled=False, research_enabled=False, perception=False, sprite_manifest='')
         db.execute('INSERT OR REPLACE INTO kv VALUES(?,?)', ('settings', json.dumps(settings, ensure_ascii=False)))
         # Connection state belongs to the old machine/account, not to the character.
         db.execute("DELETE FROM kv WHERE key LIKE 'wechat:%' OR key LIKE 'bridge_%' OR key='wechat_transport'")

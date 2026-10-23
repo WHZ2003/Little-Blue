@@ -6,7 +6,11 @@ import re
 import time
 
 ROOT = Path(__file__).resolve().parents[1] / 'assets' / 'memes'
-MARKER = re.compile(r'\[\[meme:([^\]\r\n]{0,128})\]\]', re.IGNORECASE)
+MARKER = re.compile(
+    r'\[\[(?:meme|表情)\s*[:：]\s*([^\]\r\n]{0,128})\]\]'
+    r'|\[(?:meme|表情)\s*[:：]\s*([^\]\r\n]{0,128})\]'
+    r'|【(?:meme|表情)\s*[:：]\s*([^】\r\n]{0,128})】', re.IGNORECASE)
+UNFINISHED_MARKER = re.compile(r'(?:\[\[?|【)(?:meme|表情)\s*[:：][^\]】\r\n]*$', re.IGNORECASE)
 SEND_INTERVAL = 10  # Transport burst guard, not a conversational quota.
 
 
@@ -84,12 +88,16 @@ class MemeCatalog:
                    for i in self.suggestions(text, avoid_teasing)]
         if not choices:
             return ''
-        return ('用户明确希望你多发表情包。日常闲聊默认采用“一句自然的话＋一张贴合语气的表情”，多数闲聊轮次都配图。'
-                '问候、普通接话、撒娇、打趣、吐槽、开心或道别都适合，不必等强烈情绪，也不必等用户再次提醒。'
-                '先从候选里选表达这句回复态度的图；连续几轮配图、再次用同一张都可以，不因上一轮发过就省略。'
+        return ('用户最新希望表情包稍微少一些，以这个偏好为准，替代此前多数轮次配图的要求。'
+                '普通接话以自然文字为主，表情包作为偶尔的点缀，不默认每句话都配图，也不刻意连续几轮配图。'
+                '撒娇、打趣、开心或温柔安慰时，如果候选图比文字更能传达这句的语气，可以自然配一张；不用等用户点名。'
                 '用图代替多余的动作描写、追问或叮嘱，不为发图编造情绪、经历或另起话题。'
                 '在回复末尾附加一个 [[meme:编号]] 标记，系统会尝试发送图片；一句短话加图就够，不要再解释图片。'
-                '只有这轮没有贴切的图、用户要求纯文字，或严肃说明会被配图打断时才省略。认真求助先把问题答清楚。'
+                '只使用上述机器标记，不写“[表情:名称]”等文字占位符；旧聊天里的占位文字不是正确发送示例。'
+                '图片标记不计入文字消息的30字限制，不要为了缩短文字而改写或拆开标记。'
+                '用户这轮明确要一张表情或测试发图时，请选择一张已有素材；平时少配图不抵消这次明确请求。'
+                '没有选择图片标记就不要说“看这张”“给你发了”或假装正在发图。'
+                '文字已经表达清楚时就可以不配图，不要仅因有匹配图片就发送。用户要求纯文字或严肃说明会被配图打断时省略，认真求助先把问题答清楚。'
                 '当前没有每小时张数配额，历史记忆中的1分钟8张属于旧规则；发送层只保留短间隔防刷屏保护。'
                 '难过时可以选温柔的抱抱或安慰图，不拿真实痛苦、严肃求助、健康或紧急话题开玩笑；'
                 '先不用回复或决定保持沉默时不发图。'
@@ -97,15 +105,38 @@ class MemeCatalog:
                 '不得指定文件路径、网址或收件人。仅可选择以下编号：' + json.dumps(choices, ensure_ascii=False))
 
     def extract(self, text):
-        matches = MARKER.findall(text)
-        clean = MARKER.sub('', text).strip()
+        matches = list(MARKER.finditer(text))
+        clean = UNFINISHED_MARKER.sub('', MARKER.sub('', text)).strip()
         if not matches:
             return clean, None
-        allowed = {i['id'] for i in self.available(automatic=True)}
-        tail = MARKER.search(text)
-        chosen = (matches[0] if len(matches) == 1 and matches[0] in allowed and
-                  tail and not text[tail.end():].strip() else None)
+        # Compatibility with model-produced captions; never guess an image from
+        # arbitrary descriptions, paths or URLs. Ambiguous/unknown captions fail closed.
+        allowed = self.available(automatic=True)
+        tail = matches[0]
+        value = next(group for group in tail.groups() if group is not None).strip()
+        candidates = {i['id'] for i in allowed if value in (i['id'], i['title'])}
+        chosen = next(iter(candidates)) if (len(matches) == 1 and len(candidates) == 1
+                                             and not text[tail.end():].strip()) else None
         return clean, chosen
+
+    def requested(self, text):
+        """Fallback for explicit image requests only, not ordinary emotional chat."""
+        if '表情' not in text or any(w in text for w in ('不要', '别发', '不用', '不必', '纯文字', '只发文字', '为什么', '怎么', '如何', '解释', '示例', '举例')):
+            return None
+        send = bool(re.search(r'(?:发一张|发个|发一个|发张|来张|来一张|给我发|再发)', text))
+        test = bool(re.search(r'表情.{0,24}(?:再试试|试一下|试试|测试一下)|(?:再试试|试一下|测试一下).{0,24}表情', text))
+        if not (send or test):
+            return None
+        available = self.available(automatic=True)
+        named = [i for i in available if i['title'] in text]
+        if len(named) == 1:
+            return named[0]['id']
+        # A diagnostic test or a generic request can use an existing greeting.
+        # Unknown specifically named images are never replaced with a guessed one.
+        generic = bool(re.fullmatch(r'(?:请|麻烦)?(?:给我)?(?:发一张|发个|发一个|发张|来张|来一张)(?:表情|表情包)[吧呀。！!~～ ]*', text.strip()))
+        if not named and (test or generic):
+            return next((i['id'] for i in available if i['id'] == '907'), None)
+        return None
 
 
 class MemeGate:

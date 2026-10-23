@@ -59,6 +59,38 @@ def test_catalog_integrity_paths_and_selector(catalog):
     assert MemeCatalog(catalog.root / 'missing').prompt() == ''
 
 
+@pytest.mark.parametrize('marker', ['[表情:大笑]', '[表情：大笑]', '【表情：大笑】', '[[表情:大笑]]', '[meme:087]'])
+def test_caption_markers_resolve_only_to_verified_assets(catalog, marker):
+    assert catalog.extract('哈哈。\n'+marker) == ('哈哈。', '087')
+    assert catalog.extract('示例 '+marker+' 不是发图')[1] is None
+    (catalog.root / 'community/087.webp').write_bytes(b'corrupt')
+    assert catalog.extract('哈哈。'+marker) == ('哈哈。', None)
+
+
+@pytest.mark.parametrize('marker', ['[表情:没有这张图]', '[表情:../secret]', '[表情:https://evil.test]',
+                                   '[表情:大笑][[meme:087]]', '[表情:大笑', '[[meme:087'])
+def test_bad_placeholders_never_leak_as_chat_text(catalog, marker):
+    assert catalog.extract('正常文字。\n'+marker) == ('正常文字。', None)
+
+
+def test_ambiguous_caption_cannot_select_a_random_image(catalog):
+    (catalog.root / 'community/088.webp').write_bytes(catalog.read('087'))
+    catalog.items['088'] = dict(catalog.items['087'], id='088')
+    assert catalog.extract('哈哈。[表情:大笑]') == ('哈哈。', None)
+    assert catalog.extract('哈哈。[[meme:087]]') == ('哈哈。', '087')
+
+
+def test_only_explicit_meme_request_gets_fallback(catalog):
+    data = catalog.read('087')
+    (catalog.root/'community/907.webp').write_bytes(data)
+    catalog.items['907'] = dict(catalog.items['087'],id='907',title='你好呀')
+    assert catalog.requested('发一张大笑的表情') == '087'
+    assert catalog.requested('刚刚发表情有问题，你再试试现在是不是正常了') == '907'
+    assert catalog.requested('发一张表情') == '907'
+    for text in ('为什么发表情有问题', '我回来了', '不要发一张表情', '发一张不存在的表情', '请解释怎么发一张表情', '为什么要发一张大笑的表情'):
+        assert catalog.requested(text) is None
+
+
 def test_gate_limits_restart_and_switch(core):
     gate = MemeGate(core.store, 'owner')
     assert gate.claim('087', automatic=True, now=10000)
@@ -249,6 +281,61 @@ class FakeMedia:
         if self.fail:
             raise RuntimeError('PRIVATE_UPLOAD_ERROR')
         self.images.append(data)
+
+
+@pytest.mark.parametrize('caption,ident,reply', [('欢迎回来','915','到家就好～'), ('我在这儿','906','饭慢慢吃，我在这儿待着。')])
+async def test_screenshot_regression_sends_image_instead_of_placeholder(core, catalog, caption, ident, reply):
+    from little_blue.companion import setup, exchange
+    image = catalog.read('087')
+    (catalog.root / 'community' / (ident+'.webp')).write_bytes(image)
+    catalog.items[ident] = dict(catalog.items['087'], id=ident, title=caption)
+    setup(core.store)
+    exchange(core.store, {'client':'e'*32,'persona':'keep current persona'})
+    core.settings.online = True
+    core.settings.wechat_batch_seconds = .01
+    class Client:
+        async def complete(self, messages, tools):
+            return {'content':reply+'\n[表情:'+caption+']'}
+    core.agent.client = Client()
+    api = FakeMedia()
+    channel = WeChatChannel(core, account(), api)
+    channel.memes = core.agent.memes = catalog
+    task = asyncio.create_task(channel.consume())
+    try:
+        channel.queue.put_nowait(('我回来了','ctx'))
+        async with asyncio.timeout(3):
+            while not api.images:
+                await asyncio.sleep(.01)
+        assert api.texts == [reply]
+        assert api.images == [image]
+        assert all(len(t)<=30 and '\n' not in t for t in api.texts)
+        assert all('[表情' not in r['text'] for r in core.store.continuity.recent())
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+async def test_explicit_test_request_cannot_claim_a_picture_without_selection(core, catalog):
+    from little_blue.companion import setup, exchange
+    data = catalog.read('087')
+    (catalog.root/'community/907.webp').write_bytes(data)
+    catalog.items['907'] = dict(catalog.items['087'],id='907',title='你好呀')
+    setup(core.store);exchange(core.store, {'client':'e'*32,'persona':'unchanged'})
+    core.settings.online=True;core.settings.wechat_batch_seconds=.01
+    class Client:
+        async def complete(self, messages, tools):
+            return {'content':'你看这张能不能出来。'}
+    core.agent.client=Client()
+    api=FakeMedia();channel=WeChatChannel(core,account(),api)
+    channel.memes=core.agent.memes=catalog
+    task=asyncio.create_task(channel.consume())
+    try:
+        channel.queue.put_nowait(('刚刚发表情有问题，你再试试现在是不是正常了','ctx'))
+        async with asyncio.timeout(3):
+            while not api.images:await asyncio.sleep(.01)
+        assert api.texts==['你看这张能不能出来。'] and api.images==[data]
+    finally:
+        task.cancel();await asyncio.gather(task,return_exceptions=True)
 
 
 async def test_channel_command_and_failure_fallback(core, catalog):

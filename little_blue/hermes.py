@@ -99,7 +99,13 @@ class HermesBridge:
             raise ValueError('Invalid conversation')
         active['calls'] += 1
         # This client enforces the existing persistent request/token budget and model setting.
-        message = await self.agent.client.complete(messages, body.get('tools'))
+        tool_schemas = body.get('tools')
+        if active['calls'] == 5:
+            # Reserve the final budgeted model call for a useful answer, not another tool loop.
+            messages = messages + [{'role':'system','content':
+                '本轮工具步骤已结束。请仅根据已经取得的结果给出最终回复，资料不足就说明实际限制；不再调用工具，不虚构完成结果或承诺自动补发。'}]
+            tool_schemas = None
+        message = await self.agent.client.complete(messages, tool_schemas)
         if self.active is not active:
             raise PermissionError('Turn was cancelled')
         return {'id': 'chatcmpl-' + secrets.token_hex(12), 'object': 'chat.completion',

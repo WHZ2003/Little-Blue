@@ -69,6 +69,7 @@ class Settings(Model):
     proactive: bool = True
     perception: bool = False
     tools_enabled: bool = False
+    research_enabled: bool = False
     dnd: bool = False
     follow_mouse: bool = False
     online: bool = False

@@ -26,6 +26,22 @@ def test_turn_guidance_stays_after_delivered_history():
     assert conversation_parts(messages[:2] + messages[-1:]) == ('identity\n\ncontext', [])
 
 
+async def test_last_model_call_is_reserved_for_answer(tmp_path,monkeypatch):
+    monkeypatch.setenv('LITTLE_BLUE_HERMES_URL','http://hermes:8787')
+    store=Store(tmp_path/'memory.sqlite3')
+    calls=[]
+    async def complete(messages,tools):
+        calls.append((messages,tools))
+        assert tools is None and messages[-1]['role']=='system'
+        return {'content':'Only the verified results.'}
+    bridge=HermesBridge(SimpleNamespace(store=store,settings=Settings(online=True),client=SimpleNamespace(complete=complete)))
+    bridge.active={'calls':4}
+    result=await bridge.complete({'messages':[{'role':'user','content':'research'}],'tools':[{'type':'function'}]})
+    assert result['choices'][0]['message']['content']=='Only the verified results.' and len(calls)==1
+    with pytest.raises(RuntimeError): await bridge.complete({'messages':[]})
+    store.close()
+
+
 def test_worker_refreshes_stale_identity_without_losing_previous_card(tmp_path):
     import importlib.util
     from pathlib import Path

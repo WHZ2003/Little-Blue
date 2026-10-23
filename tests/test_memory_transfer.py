@@ -43,7 +43,7 @@ def source(tmp_path):
     store = Store(folder / 'memory.sqlite3')
     store.remember('用户喜欢蓝莓茶。', 'semantic')
     store.continuity.append('user', '今天完成了答辩。', 'desktop')
-    store.put('settings', {'online': True, 'tools_enabled': True, 'perception': True, 'model': 'deepseek-flash'})
+    store.put('settings', {'online': True, 'tools_enabled': True, 'research_enabled': True, 'perception': True, 'model': 'deepseek-flash'})
     store.put('phone', {'fish': ['test-fish']})
     store.put('bridge_binding', {'account': 'old-device'})
     store.put('wechat:old-bot:cursor', 'old-session-cursor')
@@ -82,6 +82,7 @@ def test_live_wal_snapshot_roundtrip_and_restore_policy(source, tmp_path):
         assert restored.get('phone') == {'fish': ['test-fish']}
         assert restored.get('settings')['online'] is False
         assert restored.get('settings')['tools_enabled'] is False
+        assert restored.get('settings')['research_enabled'] is False
         assert restored.get('settings')['perception'] is False
         assert restored.get('bridge_binding') is None
         assert restored.get('wechat:old-bot:cursor') is None
