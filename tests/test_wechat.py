@@ -556,6 +556,25 @@ async def test_notifications_respect_dnd_cooldown_and_context_expiry(core):
     assert not core.wechat_ready and len(api.sent) == 1
 
 
+async def test_notification_cooldown_over_an_hour_survives_reload(core, monkeypatch):
+    clock = [10000.0]
+    monkeypatch.setattr(time, 'time', lambda: clock[0])
+    core.settings.proactive_cooldown = 7200
+    core.settings.proactive_per_hour = 1
+    api = FakeAPI()
+    previous = WeChatChannel(core, account(), api)
+    core.store.put(previous.key + ':sent', [6000.0])
+    channel = WeChatChannel(core, account(), api)
+    channel.accept(inbound())
+    core.wechat_state = 'connected'
+    core.emit('reminder', text='测试提醒')
+    await channel.forward_events()
+    assert not api.sent
+    clock[0] = 13200.0
+    await channel.forward_events()
+    assert api.sent == [('private-context', '测试提醒')]
+
+
 async def test_wechat_continues_desktop_activity_and_controls_during_busy_task(core):
     core.submit('我正在准备答辩')
     await core.job

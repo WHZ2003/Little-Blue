@@ -3,6 +3,22 @@ import {mkdtempSync,mkdirSync,writeFileSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';import {join} from 'node:path';
 import {SharedMemory,exportEvent,digest} from './index.mjs';
 
+test('settings panel sends only explicit validated edits and never changes persona',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'coop-settings-test-'));
+ const s=new SharedMemory({botDir:dir,dataDir:join(dir,'data'),cfg:{}});s.stopped=false;
+ const calls=[];s.transport={request:async p=>{calls.push(p);return {values:p.values};}};
+ const values={proactive:true,proactive_cooldown:3600,proactive_per_hour:1};
+ await s.webUi().invoke('preferences','state',[]);
+ await s.preferences('preferences','save',[{values,expected:values}]);
+ assert.equal(calls[0].action,'read');assert.equal(calls[1]._control,'proactive_preferences');
+ assert.deepEqual(calls[1].values,values);assert.equal('persona' in calls[1],false);
+ await assert.rejects(s.preferences('preferences','save',[{values:{...values,model:'x'},expected:values}]));
+ await assert.rejects(s.preferences('preferences','save',[{values:{...values,proactive_cooldown:0},expected:values}]));
+ assert.equal(calls.length,2);
+ s.transport={request:async()=>{throw Error('offline');}};
+ await assert.rejects(s.preferences('preferences','state',[]),/offline/);
+});
+
 test('exports only real chat and never loops imported history',()=>{
  const e={cursor:4,ts:'2026-10-22T20:00:00Z',source:'desktop-pet',type:'desktop-pet.message',meta:{text:'hello'}};
  assert.equal(exportEvent(e).text,'hello');assert.equal(exportEvent({...e,meta:{...e.meta,dafeiyuCloudId:1}}),null);

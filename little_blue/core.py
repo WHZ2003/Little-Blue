@@ -85,6 +85,7 @@ class Core:
         self.work_seconds = 0.0
         self.last_pet = float('-inf')
         self.loop_task = None
+        self.preference_task = None
         self.wechat_state = 'unbound'
         self.wechat_ready = False
         self.wechat_receiving = False
@@ -282,6 +283,9 @@ class Core:
             raise RuntimeError('This copy has already been handed off')
         write_state(folder, {**state, 'phase': 'draining'})
         self.handoff_requested = True
+        if self.preference_task:
+            self.preference_task.cancel()
+            await asyncio.gather(self.preference_task, return_exceptions=True)
         await self.bili.close()
         await self.fact_learner.close()
         await self.browser.close()
@@ -295,6 +299,18 @@ class Core:
         await self.browser.start()
         await self.bili.start()
         self.loop_task = asyncio.create_task(self._loop())
+        self.preference_task = asyncio.create_task(self._preference_loop())
+
+    async def _preference_loop(self):
+        while True:
+            await asyncio.sleep(30)
+            if not self.handoff_requested and not self.current and not self.wechat_receiving:
+                try:
+                    await self.agent.preferences.drain()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    self.store.audit('shared_preferences','retry_failed')
 
     async def _loop(self):
         last = time.monotonic()
@@ -359,6 +375,9 @@ class Core:
                 self.last_save = now
 
     async def close(self):
+        if self.preference_task:
+            self.preference_task.cancel()
+            await asyncio.gather(self.preference_task, return_exceptions=True)
         if self.loop_task:
             self.loop_task.cancel()
             await asyncio.gather(self.loop_task, return_exceptions=True)

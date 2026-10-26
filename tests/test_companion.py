@@ -76,6 +76,9 @@ async def test_chat_uses_exact_card_and_not_legacy_style(store):
         body=json.loads(request.content);seen.append(body)
         assert body['messages'][0]['content']==CARD
         assert '共同的小事' in json.dumps(body,ensure_ascii=False)
+        instructions = '\n'.join(m['content'] for m in body['messages'] if m['role'] == 'system')
+        assert '共享偏好' in instructions
+        assert '微信每条消息最多30个字' not in instructions
         return httpx.Response(200,json={'choices':[{'message':{'content':'库...'}}]})
     agent=Agent(store,settings,ToolRuntime(store,settings,approve),DeepSeekClient(store,settings,httpx.MockTransport(handle),api_key='test'))
     assert await agent.run('你好',{},chat_only=True)=='库...'
@@ -94,3 +97,34 @@ async def test_replication_endpoint_auth_and_drain(tmp_path):
         r=await c.post('/companion/sync',json=data,headers=headers);assert r.status==200
         app[CORE_KEY].handoff_requested=True
         assert (await c.post('/companion/sync',json=data,headers=headers)).status==409
+
+
+async def test_preferences_are_paired_bounded_persistent_and_conflict_checked(tmp_path):
+    from little_blue.service import create_app, CORE_KEY
+    from aiohttp.test_utils import TestClient, TestServer
+    app = create_app(Store(tmp_path/'preferences.db'), 'token'*10)
+    async with TestClient(TestServer(app)) as client:
+        headers = {'Authorization': 'Bearer '+'token'*10}
+        read = {'client': CLIENT, 'action': 'read'}
+        url = '/companion/preferences'
+        assert (await client.post(url, json=read)).status == 401
+        assert (await client.post(url, json=read, headers=headers)).status == 403
+        await client.post('/companion/sync', json={'client': CLIENT, 'persona': CARD}, headers=headers)
+        assert (await client.post(url, json=read, headers={**headers, 'Origin': 'https://evil.test'})).status == 403
+        assert (await client.post(url, json={**read, 'client': 'b'*32}, headers=headers)).status == 403
+        before = await (await client.post(url, json=read, headers=headers)).json()
+        original = app[CORE_KEY].settings.model_dump()
+        values = {'proactive': False, 'proactive_cooldown': 7200, 'proactive_per_hour': 1}
+        save = {**read, 'action': 'save', 'values': values, 'expected': before['values']}
+        for invalid in ({**values, 'model': 'other'}, {**values, 'proactive_cooldown': 59},
+                        {**values, 'proactive_per_hour': 13}, {**values, 'proactive': 'false'}):
+            assert (await client.post(url, json={**save, 'values': invalid}, headers=headers)).status == 400
+        response = await client.post(url, json=save, headers=headers)
+        assert response.status == 200 and (await response.json())['values'] == values
+        assert app[CORE_KEY].settings.model_dump() == {**original, **values}
+        assert all(app[CORE_KEY].store.get('settings')[k] == v for k, v in values.items())
+        assert profile(app[CORE_KEY].store)['persona'] == CARD
+        assert (await client.post(url, json=save, headers=headers)).status == 409
+        assert (await client.post(url, json={**read, 'values': values}, headers=headers)).status == 400
+        app[CORE_KEY].handoff_requested = True
+        assert (await client.post(url, json=read, headers=headers)).status == 409

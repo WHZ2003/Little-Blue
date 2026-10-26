@@ -179,7 +179,8 @@ class WeChatChannel:
         try:
             from .companion import profile
             from .chat_format import messages
-            parts = messages(text) if profile(self.core.store) else [text]
+            from .preferences import snapshot as preference_snapshot
+            parts = messages(text, preference_snapshot(self.core.store)['values']) if profile(self.core.store) else [text]
             if not parts:
                 return False
             generation = self.cancel_generation
@@ -599,7 +600,7 @@ class WeChatChannel:
                                            event['kind'], event.get('message_id'),
                                            bool(event['kind']=='browser_share' and event.get('requested')),
                                            event.get('request_id')))
-        self.sent = deque((t for t in self.sent if now - t < 3600), maxlen=20)
+        self.sent = deque((t for t in self.sent if now - t < 86400), maxlen=20)
         # Deferred notifications expire locally; no surprise catch-up after restarting.
         # A delayed follow-up becomes stale when the activity changes or is disabled.
         activity = self.core.store.get('current_activity')
@@ -628,7 +629,7 @@ class WeChatChannel:
             return
         if (not self.notifications or not self.core.wechat_ready or s.dnd or
                 self.core.env.focused or not s.proactive or
-                not requested and (len(self.sent) >= s.proactive_per_hour or
+                not requested and (sum(now - t < 3600 for t in self.sent) >= s.proactive_per_hour or
                 self.sent and now - self.sent[-1] < s.proactive_cooldown)):
             return
         if self.notifications[0][5] != 'reminder' and (self.core.wechat_receiving or self.core.current or not requested and now - self.context_time < 90):

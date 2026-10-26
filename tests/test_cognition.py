@@ -168,3 +168,17 @@ def test_quiet_checkin_and_recent_user_suppression(components):
     needs.social = 95
     assert not gate.eligible(3700, settings, env, needs)
     assert gate.eligible(3780, settings, env, needs)
+
+
+def test_proactive_cooldown_over_an_hour_survives_reload(components):
+    store, settings, _ = components
+    settings.proactive_cooldown = 7200
+    settings.proactive_per_hour = 1
+    gate = ProactiveGate(store)
+    gate.started = 0
+    gate.claim(1000)
+    assert not gate.available(5000, settings, Environment())
+    restored = ProactiveGate(store)
+    restored.started = 0
+    assert not restored.available(8199, settings, Environment())
+    assert restored.available(8200, settings, Environment())

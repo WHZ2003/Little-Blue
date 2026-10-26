@@ -8,6 +8,45 @@ from pydantic import Field, field_validator
 from .models import Model
 
 
+class ProactivePreferences(Model):
+    proactive: bool = Field(strict=True)
+    proactive_cooldown: int = Field(ge=60, le=86400, strict=True)
+    proactive_per_hour: int = Field(ge=0, le=12, strict=True)
+
+
+class PreferencesCommand(Model):
+    client: str = Field(pattern=r'^[a-f0-9]{32}$')
+    action: Literal['read', 'save']
+    values: ProactivePreferences | None = None
+    expected: ProactivePreferences | None = None
+
+
+async def preferences(core, raw):
+    cmd = PreferencesCommand.model_validate(raw)
+    paired = profile(core.store)
+    if not paired or paired['client'] != cmd.client:
+        raise PermissionError('Different paired desktop')
+    if core.handoff_requested:
+        raise RuntimeError('Maintenance in progress')
+    def current():
+        return {k: getattr(core.settings, k) for k in ProactivePreferences.model_fields}
+    if cmd.action == 'save':
+        if cmd.values is None or cmd.expected is None:
+            raise ValueError('Values and previous settings are required')
+        if cmd.expected.model_dump() != current():
+            raise RuntimeError('Settings changed; refresh before saving')
+        from .preferences import Proposal, Change
+        source='settings-panel:'+str(time.time_ns())
+        core.agent.preferences.commit(Proposal(changes=[Change(key=k,value=v,quote='主动消息设置面板')
+            for k,v in cmd.values.model_dump().items()]),source,source,time.time())
+        await core.configure(core.settings.model_dump())
+        core.store.audit('companion_preferences', 'proactive_updated')
+    elif cmd.values is not None or cmd.expected is not None:
+        raise ValueError('Read cannot change settings')
+    return {'values': current(), 'dnd': core.settings.dnd,
+            'wechat': {'state': core.wechat_state, 'ready': core.wechat_ready}}
+
+
 class Event(Model):
     key: str = Field(min_length=1, max_length=100, pattern=r'^[a-zA-Z0-9:_-]+$')
     role: Literal['user', 'assistant']
@@ -40,6 +79,7 @@ class Sync(Model):
     after: int = Field(0, ge=0)
     memory_after: int = Field(0, ge=0)
     export: bool = True
+    preference_ack: int = Field(0, ge=0)
 
     @field_validator('removed')
     @classmethod
@@ -48,6 +88,8 @@ class Sync(Model):
 
 
 def setup(store):
+    from .preferences import setup as setup_preferences
+    setup_preferences(store)
     with store.lock, store.db:
         store.db.executescript('''
         CREATE TABLE IF NOT EXISTS companion_events(
@@ -149,7 +191,13 @@ def exchange(store, command):
                             after=rows[-1]['id'] if rows else cmd.after,
                             memory_after=memories[-1]['id'] if memories else cmd.memory_after,
                             more=len(rows)==500 or len(memories)==500)
-        return response
+    from .preferences import snapshot
+    prefs = snapshot(store)
+    if cmd.preference_ack <= prefs['revision'] and cmd.preference_ack > prefs['desktop_ack']:
+        store.put('preference_desktop_ack', cmd.preference_ack)
+        prefs['desktop_ack'] = cmd.preference_ack
+    response['preferences'] = prefs
+    return response
 
 
 def install_routes(app, core):
@@ -162,3 +210,26 @@ def install_routes(app, core):
         result['wechat'] = {'state': core.wechat_state, 'ready': core.wechat_ready}
         return web.json_response(result)
     app.router.add_post('/companion/sync', sync)
+    async def configure_preferences(request):
+        return web.json_response(await preferences(core, await request.json()))
+    app.router.add_post('/companion/preferences', configure_preferences)
+    async def shared_preferences(request):
+        from .preferences import Request, snapshot
+        cmd = Request.model_validate(await request.json())
+        paired = profile(core.store)
+        if not paired or paired['client'] != cmd.client:
+            raise PermissionError('Different paired desktop')
+        if core.handoff_requested:
+            raise RuntimeError('Maintenance in progress')
+        if cmd.action == 'read':
+            return web.json_response({'status':'read', 'snapshot':snapshot(core.store)})
+        if not cmd.key or not cmd.text or not cmd.created:
+            raise ValueError('Original user event is required')
+        exchange(core.store, {'client':cmd.client, 'events':[{'key':cmd.key, 'role':'user',
+                 'text':cmd.text, 'created':cmd.created}], 'export':False})
+        core.agent.preferences.client = core.agent.client
+        result = await core.agent.preferences.process(cmd.text, 'desktop:'+cmd.client+':'+cmd.key, cmd.created, force=cmd.force)
+        if not core.settings.proactive and core.current and core.current.get('proactive'):
+            await core.cancel()
+        return web.json_response(result)
+    app.router.add_post('/companion/shared-preferences', shared_preferences)

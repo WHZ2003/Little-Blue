@@ -1,6 +1,6 @@
 """Private stdio transport for the local Cortico World. SSH pins the server key.
 
-Only the companion replication endpoint is exposed; no remote shell or generic HTTP
+Only companion replication and proactive preferences are exposed; no remote shell or generic HTTP
 tools are handed to the model. Secrets never occur in stdout, argv or the workspace.
 """
 import http.client
@@ -30,6 +30,13 @@ class Transport:
         self.ssh = c
 
     def request(self, payload):
+        endpoint = '/companion/sync'
+        if isinstance(payload, dict) and '_control' in payload:
+            if payload['_control'] not in ('proactive_preferences', 'shared_preferences'):
+                raise ValueError('Unsupported control')
+            control = payload['_control']
+            payload = {k: v for k, v in payload.items() if k != '_control'}
+            endpoint = '/companion/preferences' if control == 'proactive_preferences' else '/companion/shared-preferences'
         self.connect()
         channel = self.ssh.get_transport().open_channel('direct-tcpip', ('127.0.0.1', 8765), ('127.0.0.1', 0), timeout=15)
         channel.settimeout(30)
@@ -39,11 +46,13 @@ class Transport:
             body = json.dumps(payload, ensure_ascii=False).encode()
             if len(body) > 900000:
                 raise ValueError('Replication batch exceeds limit')
-            connection.request('POST', '/companion/sync', body, {'Authorization': 'Bearer '+self.token, 'Content-Type': 'application/json'})
+            connection.request('POST', endpoint, body, {'Authorization': 'Bearer '+self.token, 'Content-Type': 'application/json'})
             response = connection.getresponse()
             result = json.loads(response.read())
             if response.status != 200:
-                raise RuntimeError('Replication HTTP '+str(response.status))
+                if response.status == 409:
+                    raise RuntimeError('Settings changed or maintenance in progress; refresh and retry')
+                raise RuntimeError('Cloud request failed (HTTP '+str(response.status)+')')
             return result
         finally:
             connection.close()
