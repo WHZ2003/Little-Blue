@@ -156,3 +156,11 @@ async def test_background_and_plain_chat_do_not_receive_video_authority(store, p
         return {'content': '好。'}
     agent.harness = SimpleNamespace(run=run)
     await agent.run(text, {}, chat_only=True, proactive=proactive, reflection=reflection)
+
+
+async def test_subtitles_cannot_be_reported_as_watched_frames(store):
+    agent=Agent(store,Settings(online=True),None,SimpleNamespace())
+    async def run(*args,**kwargs):return {'content':'看完了，吃饭那一段我也看到了。'}
+    agent.harness=SimpleNamespace(run=run)
+    answer=await agent.run(SHARE,{},chat_only=True)
+    assert '没有在电脑上播放' in answer and '我也看到了' not in answer

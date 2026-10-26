@@ -6,6 +6,7 @@ from pathlib import PurePosixPath
 from typing import Literal
 from pydantic import Field, field_validator
 from .models import Model
+from .video_watch import Desktop as VideoDesktop
 
 
 class ProactivePreferences(Model):
@@ -80,6 +81,7 @@ class Sync(Model):
     memory_after: int = Field(0, ge=0)
     export: bool = True
     preference_ack: int = Field(0, ge=0)
+    video_watch: VideoDesktop | None = None
 
     @field_validator('removed')
     @classmethod
@@ -90,6 +92,8 @@ class Sync(Model):
 def setup(store):
     from .preferences import setup as setup_preferences
     setup_preferences(store)
+    from .video_watch import setup as setup_video
+    setup_video(store)
     with store.lock, store.db:
         store.db.executescript('''
         CREATE TABLE IF NOT EXISTS companion_events(
@@ -197,6 +201,9 @@ def exchange(store, command):
         store.put('preference_desktop_ack', cmd.preference_ack)
         prefs['desktop_ack'] = cmd.preference_ack
     response['preferences'] = prefs
+    if cmd.video_watch is not None:
+        from .video_watch import exchange as video_exchange
+        response['video_watch'] = video_exchange(store, cmd.client, cmd.video_watch)
     return response
 
 

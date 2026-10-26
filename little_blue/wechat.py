@@ -134,6 +134,8 @@ class WeChatChannel:
         self.accepted_mid = None
         self.text_send_lock = asyncio.Lock()
         self.incoming_images = {}  # Bounded pending references; never persisted or logged.
+        from .video_watch import setup as setup_video
+        setup_video(core.store)
 
     def accept(self, message):
         if (not isinstance(message, dict) or message.get('from_user_id') != self.account.owner or
@@ -328,6 +330,8 @@ class WeChatChannel:
                         continue
                     if text == '/cancel':
                         self.cancel_generation += 1
+                        from .video_watch import cancel as cancel_video
+                        cancel_video(self)
                         self.incoming_images.clear()
                         self.core.store.continuity.cancel_inbox()
                         self.held = None
@@ -540,6 +544,16 @@ class WeChatChannel:
                 text = '\n'.join(p[0] for p in parts)
                 context = parts[-1][1]
                 ids = [p[2] for p in parts if p[2] is not None]
+                from .video_watch import handle as handle_video
+                video_reply = await handle_video(self, ids)
+                if video_reply is not None:
+                    if generation != self.cancel_generation:
+                        return
+                    mid = self.core.store.continuity.append('assistant', video_reply, 'wechat', delivery='pending')
+                    delivered = await self.send(context, video_reply)
+                    self.core.store.continuity.delivered(mid, delivered)
+                    self.core.store.continuity.inbox_state(ids, 'answered' if delivered else 'failed')
+                    return
                 # A desktop task may have started during the late-batch wait.
                 try:
                     async with asyncio.timeout(245):
@@ -667,6 +681,8 @@ class WeChatChannel:
             if self.core.handoff_requested:
                 continue
             await self.forward_events()
+            from .video_watch import deliver_results
+            await deliver_results(self)
 
     async def run(self):
         self.core.wechat_state = 'connecting'

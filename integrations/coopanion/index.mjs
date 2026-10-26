@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { shortBeats } from './chat-format.mjs';
 import { attachPreferences, candidate, guidance, KEY } from './preferences.mjs';
+import { VideoRelay } from './video-watch.mjs';
 
 export const digest = text => createHash('sha256').update(text).digest('hex');
 export function atomic(path, text) {
@@ -127,12 +128,13 @@ export class SharedMemory {
   async start(host){
     this.host=host;this.stopped=false;
     this.preferenceBridge=attachPreferences(this);
+    this.videoRelay=new VideoRelay(this);
     // Recover the narrow crash window after event append and before state checkpoint.
     let before=host.store.latestCursor();
     while(before>0){const rows=host.store.range({toCursor:before,limit:1000});if(!rows.length)break;for(const e of rows)if(e.meta?.dafeiyuCloudId)this.state.imported[e.meta.dafeiyuCloudId]=e.cursor;before=rows[0].cursor-1;}
     this.save();void this.sync();this.timer=setInterval(()=>void this.sync(),5000);
   }
-  async stop(){this.stopped=true;clearInterval(this.timer);if(globalThis[KEY]===this.preferenceBridge)delete globalThis[KEY];this.transport.close();}
+  async stop(){this.stopped=true;clearInterval(this.timer);await this.videoRelay?.stop();if(globalThis[KEY]===this.preferenceBridge)delete globalThis[KEY];this.transport.close();}
   onTurnEnded(){if(this.preferenceBridge){this.preferenceBridge.receipt=null;this.preferenceBridge.spoke=false;this.preferenceBridge.historyReceipt=false;}this.latestPreferenceEvent=null;}
   files(){
     const out=[],seen=new Set();
@@ -158,10 +160,11 @@ export class SharedMemory {
       if(cursor===candidates.at(-1)?.cursor||!candidates.length)cursor=upper;
       const files=[];for(const f of this.files()){const n=Buffer.byteLength(JSON.stringify(f));if(files.length>=10||bytes+n>750000)break;files.push(f);bytes+=n;}
       const persona=readFileSync(this.ctx.cfg.personaSnapshot,'utf8');
-      const response=await this.transport.request({client:this.state.client,events,files,removed:this.removed,persona,after:this.state.after,memory_after:this.state.memoryAfter,preference_ack:this.state.preferences?.revision||0});
+      const response=await this.transport.request({client:this.state.client,events,files,removed:this.removed,persona,after:this.state.after,memory_after:this.state.memoryAfter,preference_ack:this.state.preferences?.revision||0,...(this.videoRelay?{video_watch:this.videoRelay.payload()}:{})});
       if(this.stopped)return;
       if(response.persona_sha256!==digest(persona))throw new Error('persona_hash_mismatch');
       if(response.preferences)this.acceptPreferences(response.preferences);
+      if(response.video_watch)this.videoRelay?.accept(response.video_watch);
       this.state.localCursor=cursor;Object.assign(this.state.files,response.files);
       for(const path of response.removed||[])delete this.state.files[path];
       const changed=[];
