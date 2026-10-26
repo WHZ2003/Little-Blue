@@ -11,20 +11,20 @@ from .bili_chat import references
 
 ACTIVE = ('queued', 'claimed', 'playing')
 REASONS = {
-    'offline': '电脑上的大肥鱼未连接，无法打开播放。',
-    'unavailable': '电脑上的视频插件尚未就绪，无法打开播放。',
-    'busy': '电脑正在处理另一项视频观看，未打开新视频。',
-    'expired': '电脑没有及时接收这次观看请求，已取消，之后不会补开。',
-    'disconnected': '电脑连接中断，无法确认播放完成。',
-    'restarted': '桌面程序已重启，这次观看已中断，不会自动重播。',
-    'open_failed': '视频页面未能打开，或页面没有可用播放器。',
-    'play_failed': '页面打开了，但未能确认视频开始播放（可能需登录或有播放限制）。',
-    'stalled': '视频长时间没有继续播放，未确认看完。',
-    'taken_over': '页面已切换或不再由我管理，已停止这次观看。',
-    'interrupted': '观看被中止，没有看完。',
-    'closed': '视频页面被关闭，没有看完。',
-    'unsupported': '当前只支持两小时以内、第一 P 的 B 站视频。',
-    'incomplete': '播放进度出现跳转或缺少完整播放的证据，不能说看完。',
+    'offline': '电脑这边还没连上，这次打不开。',
+    'unavailable': '电脑上的播放器还没准备好，这次没打开。',
+    'busy': '我还在处理上一个视频，这个先没打开。',
+    'expired': '电脑没及时接到这次请求，没打开，之后也不会突然补播。',
+    'disconnected': '电脑断开了，这段有没有播完，我还不能确定。',
+    'restarted': '电脑上的程序重启了，视频中断了，没有自动重播。',
+    'open_failed': '没播起来，网页没打开，或者里面的播放器没加载出来。',
+    'play_failed': '网页打开了，但视频没播起来，可能需要登录或有播放限制。',
+    'stalled': '视频卡住好一会儿了，这段没播完。',
+    'taken_over': '页面被接管或切走了，我停下了，还没看完。',
+    'interrupted': '这次中断了，没看完。',
+    'closed': '视频页关掉了，这段没播完。',
+    'unsupported': '这个暂时播不了，我现在只能打开 B 站第一 P、两小时以内的视频。',
+    'incomplete': '这段没确认播完整，进度可能跳过了，不能算看完。',
 }
 
 
@@ -101,13 +101,20 @@ def select_request(store, ids, now):
             context_text+='\n'+prior['text']
     if not refs:
         # Do not turn arbitrary "看看这个" into a video command without video context.
-        return {'error': '没有识别到可打开的视频，请发这个视频的 B 站链接或 BV 号；还没有播放。'} if re.search(r'视频|B站|b站|播放',words) or re.search(r'B站|B 站|bilibili|视频页面|视频封面',context_text,re.I) else None
-    if len(refs) != 1: return {'error': '识别到不止一个视频，请明确这次要播放哪一个；还没有打开网页。'}
+        return {'error': '还没找到这个视频。把 B 站链接或 BV 号发我吧，现在还没播放。'} if re.search(r'视频|B站|b站|播放',words) or re.search(r'B站|B 站|bilibili|视频页面|视频封面',context_text,re.I) else None
+    if len(refs) != 1: return {'error': '这里有好几个视频，你想让我看哪个？我先没打开。'}
     return {'url': refs[0], 'source': 'wechat-video:' + ':'.join(str(r['id']) for r in rows)}
 
 
 def notice(store, job, kind, text, now):
     store.db.execute('INSERT OR IGNORE INTO video_watch_notices(job,kind,text,created) VALUES(?,?,?,?)', (job,kind,text,now))
+
+
+def video_title(title):
+    name = re.sub(r'[\s\x00-\x1f]+', ' ', title).strip()[:200]
+    while name.startswith('《') and name.endswith('》'):
+        name = name[1:-1].strip()
+    return f'《{name}》' if name else '这个视频'
 
 
 def finish(store, row, report, now):
@@ -119,14 +126,17 @@ def finish(store, row, report, now):
             result.update(state='failed',reason='incomplete')
     store.db.execute('UPDATE video_watch_jobs SET state=?,result=?,updated=? WHERE id=?',
                      (result['state'],json.dumps(result,ensure_ascii=False),now,row['id']))
-    title = re.sub(r'[\r\n\x00-\x1f]', ' ', result.get('title',''))[:200]
     if result['state']=='completed':
-        text = f'电脑上的《{title or "你发的视频"}》已实际播放到结尾，播放进度已核验。'
+        text = f'{video_title(result.get("title", ""))}播完啦。'
     else:
-        text = '这次视频没有确认看完：'+REASONS.get(result.get('reason'),REASONS['interrupted'])
-    if result.get('cleanup')=='closed': text += ' 已关闭我自己打开的标签页。'
-    elif result.get('cleanup')=='failed': text += ' 自己的标签页关闭失败，仍保留着。'
-    elif result.get('cleanup')=='retained': text += ' 页面已保留，没有关闭你的网页。'
+        text = REASONS.get(result.get('reason'),REASONS['interrupted'])
+    if result.get('cleanup')=='closed': text += '我开的那页也关好了。'
+    elif result.get('cleanup')=='failed': text += '不过我开的那页没关成功，还留着。'
+    elif result.get('cleanup')=='retained': text += '我没有再动那个网页。'
+    # A delayed start notice is obsolete once the video has stopped. In particular,
+    # a single sync batch gives both notices the same timestamp; alphabetical order
+    # used to send "result" before "started".
+    store.db.execute("UPDATE video_watch_notices SET state='superseded' WHERE job=? AND kind='started' AND state='ready'",(row['id'],))
     notice(store,row['id'],'result',text,now)
 
 
@@ -140,14 +150,14 @@ def submit(store, selection, client, who, now=None):
     with store.lock, store.db:
         expire(store,now)
         old = store.db.execute('SELECT * FROM video_watch_jobs WHERE source=?',(selection['source'],)).fetchone()
-        if old: return '这个观看请求已经登记，不会重复打开；结果以实际播放回执为准。'
+        if old: return '这个请求已经收到过了，我没有重复打开。'
         heartbeat = store.get('video_watch_desktop',{})
         if heartbeat.get('client') != client or now-heartbeat.get('at',0)>25: return REASONS['offline']
         if not heartbeat.get('ready'): return REASONS['unavailable']
         if store.db.execute("SELECT 1 FROM video_watch_jobs WHERE state IN ('queued','claimed','playing')").fetchone(): return REASONS['busy']
         store.db.execute('INSERT INTO video_watch_jobs(id,source,client,session,token,requester,url,state,created,updated,lease) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
                          (uuid.uuid4().hex,selection['source'],client,heartbeat['session'],uuid.uuid4().hex,who,selection['url'],'queued',now,now,now+45))
-    return '已向在线电脑提交观看请求。确认打开播放后会告诉你，播放完成或失败也会回报；现在还没有看完。'
+    return '好呀，我去电脑上打开看看。'
 
 
 def exchange(store, client, command, now=None):
@@ -172,8 +182,7 @@ def exchange(store, client, command, now=None):
                 if report.position <= 0 or report.duration <= 0: raise ValueError('Playback evidence missing')
                 if row['state']=='claimed':
                     store.db.execute("UPDATE video_watch_jobs SET state='playing',result=?,updated=? WHERE id=?",(report.model_dump_json(),now,row['id']))
-                    title=re.sub(r'[\r\n\x00-\x1f]',' ',report.title)[:200]
-                    notice(store,row['id'],'started',f'已在电脑上打开自己的标签页，确认《{title or "你发的视频"}》开始播放。',now)
+                    notice(store,row['id'],'started',f'{video_title(report.title)}播起来了。',now)
             else: finish(store,row,report.model_dump(),now)
             accepted.append(report.id+':'+report.state)
         claimed=None
@@ -198,19 +207,19 @@ async def handle(channel, ids):
     words='\n'.join(original(r['text']) for r in channel.core.store.continuity.received(ids)) if ids else ''
     if re.search(r'^(?:先)?(?:别看了|不要看了|停止播放|停止看视频|取消观看)[。！!\s]*$',words):
         cancel(channel)
-        return '已取消这次观看请求，电脑连接正常时会停止自己的视频页，不会操作你的网页。'
+        return '好，不继续看了。停止请求已经发过去，电脑连着的话就会停下。'
     generation=channel.cancel_generation
     selection=select_request(channel.core.store,ids,time.time())
     if not selection: return None
     if selection.get('error'): return selection['error']
     if not channel.core.settings.online or channel.core.handoff_requested:
-        return '当前联网已关闭或程序正在维护，未打开视频。'
+        return '现在关着联网，或者程序正在维护，这次没打开视频。'
     if 'b23.tv/' in selection['url']:
         from .bili_chat import SharedVideoReader
         try: selection['url']=await SharedVideoReader('',channel.core.store).resolve(selection['url'])
-        except Exception: return '视频短链接没有解析成功，未打开网页。请发完整 B 站链接或 BV 号。'
+        except Exception: return '这个短链接没打开。换个完整的 B 站链接或 BV 号给我吧。'
     if not selection['url'].endswith('/?p=1'): return REASONS['unsupported']
-    if generation!=channel.cancel_generation:return '这次观看请求已取消，未打开网页。'
+    if generation!=channel.cancel_generation:return '好，这次取消了，没打开网页。'
     return submit(channel.core.store,selection,paired['client'],requester(channel))
 
 
@@ -226,7 +235,9 @@ async def deliver_results(channel):
     if not channel.core.wechat_ready or channel.processing or channel.core.current or channel.stopping: return
     with store.lock,store.db:
         store.db.execute("UPDATE video_watch_notices SET state='expired' WHERE state='ready' AND created<?",(now-12*3600,))
-        row=store.db.execute("SELECT n.* FROM video_watch_notices n JOIN video_watch_jobs j ON j.id=n.job WHERE j.requester=? AND n.state='ready' ORDER BY n.created,n.kind LIMIT 1",(requester(channel),)).fetchone()
+        # Also retire stale starts persisted by older versions before this fix.
+        store.db.execute("UPDATE video_watch_notices SET state='superseded' WHERE kind='started' AND state='ready' AND job IN (SELECT id FROM video_watch_jobs WHERE state NOT IN ('queued','claimed','playing'))")
+        row=store.db.execute("SELECT n.* FROM video_watch_notices n JOIN video_watch_jobs j ON j.id=n.job WHERE j.requester=? AND n.state='ready' ORDER BY n.created,CASE n.kind WHEN 'started' THEN 0 ELSE 1 END LIMIT 1",(requester(channel),)).fetchone()
         if not row:return
         store.db.execute("UPDATE video_watch_notices SET state='sending' WHERE job=? AND kind=?",(row['job'],row['kind']))
     # Claim before network I/O. An ambiguous send is never replayed on restart.

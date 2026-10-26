@@ -56,7 +56,7 @@ def test_non_watch_requests_dont_open_recent_video(store,text):
 
 
 def test_offline_request_does_not_queue_for_later(store):
-    assert '未连接' in v.submit(store,{'source':'one','url':URL},CLIENT,'requester',100)
+    assert '还没连上' in v.submit(store,{'source':'one','url':URL},CLIENT,'requester',100)
     desktop(store,101)
     assert desktop(store,102)['job'] is None
 
@@ -65,7 +65,7 @@ def test_unreadable_video_screenshot_is_explicit_failure(store):
     now=time.time()
     store.continuity.append('user','[用户发送了微信图片]\n[图片自动识别结果：B站视频页面，编号看不清]','wechat',now=now)
     mid=store.continuity.append('user','看看这个','wechat',now=now+1)
-    assert '还没有播放' in v.select_request(store,[mid],now+1)['error']
+    assert '还没播放' in v.select_request(store,[mid],now+1)['error']
 
 
 def test_claim_receipt_is_required_and_wrong_client_cannot_claim(store):
@@ -114,13 +114,14 @@ async def test_wechat_handler_queues_actual_request_and_reports_result_without_m
     api=API();channel=WeChatChannel(core,Account(token='test',owner='owner',bot='bot'),api)
     now=time.time();desktop(core.store,now)
     mid=core.store.continuity.append('user','看看这个 '+URL,'wechat',now=now)
-    assert '提交' in await v.handle(channel,[mid])
+    assert await v.handle(channel,[mid]) == '好呀，我去电脑上打开看看。'
     j=desktop(core.store,now+1)['job'];claim(core.store,j,now+2)
-    desktop(core.store,now+3,reports=[report(j,'playing',duration=2,position=.1,played=.1)])
-    desktop(core.store,now+5,reports=[report(j,'completed',duration=2,position=2,played=2,cleanup='closed')])
     channel.context='test-context';channel.context_time=time.time();core.wechat_state='connected';core.wechat_ready=True
+    desktop(core.store,now+3,reports=[report(j,'playing',duration=2,position=.1,played=.1,title='《测试》')])
+    await v.deliver_results(channel)
+    desktop(core.store,now+5,reports=[report(j,'completed',duration=2,position=2,played=2,cleanup='closed',title='《测试》')])
     await v.deliver_results(channel);await v.deliver_results(channel);await v.deliver_results(channel)
-    assert len(api.sent)==2 and '开始播放' in api.sent[0] and '实际播放到结尾' in api.sent[1]
+    assert api.sent == ['《测试》播起来了。','《测试》播完啦。我开的那页也关好了。']
     assert all('字幕' not in t for t in api.sent)
     core.store.close()
 
@@ -160,11 +161,40 @@ async def test_real_wechat_consumer_routes_to_desktop_and_returns_receipts(tmp_p
         await api.updates.put({'msgs':[{'message_id':1,'from_user_id':'owner','message_type':1,'message_state':2,
             'context_token':'test-context','item_list':[{'type':1,'text_item':{'text':'看看这个 '+URL}}]}]})
         await until(lambda:len(api.sent)>=1)
-        assert '提交观看请求' in api.sent[0]
+        assert api.sent[0] == '好呀，我去电脑上打开看看。'
         now=time.time();j=desktop(core.store,now)['job'];claim(core.store,j,now)
         desktop(core.store,now+.1,reports=[report(j,'playing',duration=2,position=.1,played=.1)])
+        await until(lambda:any('播起来了' in x for x in api.sent))
         desktop(core.store,now+3,reports=[report(j,'completed',duration=2,position=2,played=2,cleanup='closed')])
-        await until(lambda:any('实际播放到结尾' in x for x in api.sent))
+        await until(lambda:any('播完啦' in x for x in api.sent))
         assert len(api.sent)==3
     finally:
         task.cancel();await asyncio.gather(task,return_exceptions=True);core.store.close()
+
+
+@pytest.mark.parametrize('outcome',['completed','failed'])
+async def test_same_sync_batch_delivers_only_current_result_not_a_stale_start(store,outcome):
+    from types import SimpleNamespace
+    j=job(store);claim(store,j)
+    desktop(store,114,reports=[report(j,'playing',duration=10,position=1,played=1,title='《测试》'),
+                              report(j,outcome,duration=10,position=10,played=10,title='《测试》',reason='stalled')])
+    channel=SimpleNamespace(core=SimpleNamespace(store=store,wechat_ready=True,current=None),processing=False,stopping=False,context='x',key='key',account=SimpleNamespace(owner='owner'))
+    sent=[]
+    async def send(ctx,text):sent.append(text);return True
+    channel.send=send
+    with store.db:
+        store.db.execute('UPDATE video_watch_jobs SET requester=?',(v.requester(channel),))
+        store.db.execute('UPDATE video_watch_notices SET created=?',(time.time(),))
+    await v.deliver_results(channel);await v.deliver_results(channel)
+    assert len(sent)==1 and '播起来了' not in sent[0]
+    assert ('播完啦' in sent[0]) == (outcome=='completed')
+    assert store.db.execute("SELECT state FROM video_watch_notices WHERE kind='started'").fetchone()[0]=='superseded'
+    # Simulate the old release's unsent start left behind after a terminal receipt.
+    with store.db:store.db.execute("UPDATE video_watch_notices SET state='ready' WHERE kind='started'")
+    await v.deliver_results(channel)
+    assert len(sent)==1
+
+
+@pytest.mark.parametrize('title',['测试','《测试》','《《测试》》','\n《测试》\n'])
+def test_video_titles_have_one_pair_of_book_marks(title):
+    assert v.video_title(title)=='《测试》'
