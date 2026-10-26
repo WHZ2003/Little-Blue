@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'tools\cache-env.ps1')
 $appPath = Join-Path $PSScriptRoot '.research\Coopanion\Coopanion.exe'
 if (-not (Test-Path -LiteralPath $appPath)) {
     throw 'Coopanion portable app is missing. See docs/coopanion-local.md.'

@@ -1,5 +1,6 @@
 param([switch]$DebugMode, [switch]$ContainerCore, [switch]$LocalOnly, [switch]$Panel)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'tools\cache-env.ps1')
 Set-Location -LiteralPath $PSScriptRoot
 $petPython = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 if (!(Test-Path -LiteralPath $petPython)) { $petPython = 'python' }

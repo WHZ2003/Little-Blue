@@ -2,10 +2,12 @@
 .python/
 .uv-tool/
 .uv-cache/
+.cache/
 __pycache__/
 .pytest_cache/
 .test-tmp*/
 qa-output/
+artifacts/
 .research/
 .secrets/
 *.egg-info/

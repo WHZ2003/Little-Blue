@@ -1,5 +1,6 @@
 param([switch]$WaitReady)
 $ErrorActionPreference = 'Stop'
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'tools\cache-env.ps1')
 $serviceRoot = $PSScriptRoot
 $healthUrl = 'http://127.0.0.1:18892/health'
 function Test-VoiceReady {

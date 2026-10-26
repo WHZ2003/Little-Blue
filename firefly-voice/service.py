@@ -7,6 +7,12 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parent
+# Also cover direct Python launches; keep Seed-VC's existing checkpoint path.
+for variable, folder in {'XDG_CACHE_HOME': 'xdg', 'HF_HOME': 'huggingface',
+                         'TORCH_HOME': 'torch', 'NUMBA_CACHE_DIR': 'numba'}.items():
+    cache = ROOT.parent / '.cache' / folder
+    cache.mkdir(parents=True, exist_ok=True)
+    os.environ[variable] = str(cache)
 os.chdir(ROOT / 'seed-vc')
 sys.path.insert(0, str(ROOT / 'seed-vc'))
 os.environ['HF_HUB_DISABLE_XET'] = '1'

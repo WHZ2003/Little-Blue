@@ -38,6 +38,7 @@ Invoke-RestMethod http://127.0.0.1:18892/health
 本机隔离环境使用 Python 3.10.22、PyTorch 2.4.1 + CUDA 12.4；完整依赖见 `requirements-lock.txt`。重新安装时使用 PyTorch 官方 CUDA 索引解析带 `+cu124` 的版本；不要直接覆盖安装上游未锁定的 requirements。复现训练需先准备原始数据，运行 `prepare_data.py`，然后在 `seed-vc` 目录执行：
 
 ```powershell
+. ..\..\tools\cache-env.ps1
 ..\.venv\Scripts\python.exe -u train.py --config configs/presets/config_dit_mel_seed_uvit_whisper_small_wavenet.yml --dataset-dir ../data/train-v1 --run-name firefly-zh-v1-new --batch-size 1 --max-steps 1000 --save-every 250 --num-workers 0
 ```
 

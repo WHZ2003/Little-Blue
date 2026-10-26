@@ -5,6 +5,7 @@ param(
     [switch]$SkipTests
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'tools\cache-env.ps1')
 Set-Location -LiteralPath $PSScriptRoot
 
 function Invoke-Checked {
