@@ -3,12 +3,16 @@
 Pass --package to test on an isolated copy before installing. Requires browser repair.
 """
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import shutil
 import time
 
 from patch_coopanion_majsoul import ROOT, PACKAGE, replace
+from patch_coopanion_majsoul_companion import prepare_companion
+from patch_coopanion_majsoul_native import prepare_native
+from patch_coopanion_majsoul_ui import prepare_ui
 
 MARKER = '// DaFeiYu: local strategy v1'
 
@@ -88,6 +92,15 @@ def prepare(package):
         "'worlds.majsoul.localStrategy': { type: 'boolean', 'x-hot': false, title:")
     for name in ['strategy.ts', 'local-player.ts', 'ENV_PROMPT.md']:
         changed['src/' + name] = (ROOT / 'integrations/majsoul' / name).read_text(encoding='utf-8')
+    changed = prepare_ui(prepare_native(prepare_companion(changed)))
+    # Extension assets are cached immutably by URL. A content-based filename
+    # refreshes existing browsers without changing the upstream package version.
+    client = changed['src/webui/client.js']
+    digest = hashlib.sha256(client.encode('utf-8')).hexdigest()[:12]
+    entry = f'src/webui/companion-{digest}.js'
+    changed[entry] = client
+    meta['cortico']['webUiClient'] = entry
+    changed['package.json'] = json.dumps(meta, ensure_ascii=False, indent=2) + '\n'
     return changed
 
 
