@@ -6,6 +6,7 @@ import secrets
 from urllib.parse import urlencode, urlsplit
 
 import httpx
+from .memes import IMAGE_LIMIT, image_format
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
@@ -32,9 +33,8 @@ def upload_url(result, filekey):
 async def send_image(api, context, data, permitted=lambda: True):
     if (not context or not api.account or not api.account.enabled or not permitted()):
         raise PermissionError('图片发送已关闭或会话不可用')
-    if (not isinstance(data, bytes) or not 12 <= len(data) <= 2 * 1024 * 1024 or
-            data[:4] != b'RIFF' or data[8:12] != b'WEBP'):
-        raise ValueError('只发送已校验的本地 WebP 表情')
+    if (not isinstance(data, bytes) or not 12 <= len(data) <= IMAGE_LIMIT or not image_format(data)):
+        raise ValueError('只发送已校验的本地 WebP / GIF 表情')
     key, filekey = secrets.token_bytes(16), secrets.token_hex(16)
     padder = padding.PKCS7(128).padder()
     padded = padder.update(data) + padder.finalize()

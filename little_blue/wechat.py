@@ -271,14 +271,21 @@ class WeChatChannel:
             return False
         if len(words) == 2 and words[1] in ('on', 'off'):
             self.meme_gate.set_enabled(words[1] == 'on')
-        elif len(words) != 1:
-            await self.send(context, '用法：/memes、/memes on、/memes off；/meme 087 点发表情。')
-            return True
         items = self.memes.available()
+        query = ' '.join(words[1:]) if words[1:] and words[1] not in ('on', 'off') else ''
+        page = int(query) if query.isascii() and query.isdigit() else 1
+        if query and not query.isdigit():
+            items = [i for i in items if query in ' '.join([i['id'], i['title'], i.get('emotion',''), *i.get('tags',[])])]
+        items.sort(key=lambda i: (i.get('source') != 'nekowhale', i['id']))
+        total = len(items)
+        pages = max(1, (total + 11) // 12)
+        page = max(1, min(page, pages))
+        items = items[(page-1)*12:page*12]
         reply = ('自动配图：' + ('开' if self.meme_gate.enabled() else '关') +
                  '\n自动配图自由选择，不设每小时张数配额；仅保留10秒发送间隔防刷屏。' +
                  '\n发送 /meme 编号 点发；/memes off 关闭自动配图，仍可手动点发。\n' +
                  '\n'.join(i['id'] + ' · ' + i['title'] for i in items))
+        reply += f'\n共{total}张，第{page}/{pages}页。/memes 2 翻页；/memes 摸鱼 搜索。'
         if not items:
             reply += '\n本机尚未安装表情素材。'
         await self.send(context, reply)

@@ -172,9 +172,10 @@ def test_cdn_whitelist(url):
         upload_url({'upload_full_url': url}, 'filekey')
 
 
-async def test_real_wire_crypto_and_headers(catalog):
+@pytest.mark.parametrize('fmt', ['webp', 'gif'])
+async def test_real_wire_crypto_and_headers(catalog, fmt):
     calls = []
-    plaintext = catalog.read('087')
+    plaintext = catalog.read('087') if fmt == 'webp' else b'GIF89a' + b'synthetic-gif-fixture'
     state = {}
     def handle(request):
         calls.append(request)

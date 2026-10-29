@@ -1,4 +1,59 @@
-export default {panels:{preferences:{mount(ctx){
+export function mountStickers(ctx) {
+  const {root,ui,signal}=ctx,doc=root.ownerDocument;
+  const make=(tag,text)=>{const el=doc.createElement(tag);if(text)el.textContent=text;return el;};
+  const form=make('form');form.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:18px 0';
+  const query=make('input');query.type='search';query.maxLength=120;query.placeholder='搜索名称、情绪或编号，例如：摸鱼';query.setAttribute('aria-label','搜索表情');
+  query.style.cssText='flex:1;min-width:180px;padding:10px;border:1px solid #a1a1aa;border-radius:8px;background:transparent;color:inherit';
+  const search=ui.button('搜索',{onClick:()=>void load(1)});form.append(query,search);
+  const status=ui.msgline(),grid=make('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px';
+  const selected=make('section');selected.hidden=true;selected.style.cssText='margin:20px 0;padding:16px;border:1px solid #a1a1aa;border-radius:12px';
+  const title=make('h3'),picture=make('img');picture.style.cssText='display:block;width:220px;max-width:100%;height:220px;object-fit:contain;background:#f1f5f9;border-radius:10px;margin:12px 0';
+  const description=make('p'),receipt=ui.msgline(),actions=ui.actions();
+  let chosen=null,page=1,pages=1,busy=false,previewVersion=0;
+  async function copy(text){try{await navigator.clipboard.writeText(text);receipt.textContent='已复制，粘贴到对应聊天窗口即可。';}catch{receipt.textContent='无法自动复制，请手动复制：'+text;}}
+  actions.append(ui.button('复制微信命令',{onClick:()=>chosen&&void copy('/meme '+chosen.id)}),
+    ui.button('复制屏幕聊天请求',{onClick:()=>chosen&&void copy('发一张'+chosen.title+'表情')}));
+  selected.append(title,picture,description,actions,receipt);
+  const nav=ui.actions(),position=make('span');
+  const prev=ui.button('上一页',{onClick:()=>void load(page-1)}),next=ui.button('下一页',{onClick:()=>void load(page+1)});
+  nav.style.marginTop='16px';nav.append(prev,position,next);
+  function buttons(){search.disabled=busy;prev.disabled=busy||page<=1;next.disabled=busy||page>=pages;}
+  async function preview(item){
+    const version=++previewVersion;chosen=item;selected.hidden=false;title.textContent=item.title+' · '+item.id;picture.hidden=true;picture.removeAttribute('src');
+    description.textContent=item.context;receipt.textContent='正在读取动图…';
+    try{
+      const result=await ctx.invoke('preview',[{id:item.id}]);
+      if(signal.aborted||version!==previewVersion)return;
+      picture.alt=item.title;picture.onload=()=>{if(version===previewVersion)receipt.textContent='预览就绪。选择下方命令，在聊天中使用这张表情。';};
+      picture.onerror=()=>{if(version===previewVersion)receipt.textContent='图片无法显示，请重新选择或检查素材。';};
+      picture.src=result.src;picture.hidden=false;
+    }catch{if(!signal.aborted&&version===previewVersion)receipt.textContent='这张表情暂不可用，请检查本机素材是否已安装。';}
+  }
+  async function load(wanted){
+    if(busy||signal.aborted)return;busy=true;buttons();status.textContent='正在读取表情…';
+    try{
+      const result=await ctx.invoke('list',[{query:query.value.trim(),page:Math.max(1,wanted)}]);
+      if(signal.aborted)return;page=result.page;pages=result.pages;grid.replaceChildren();
+      status.textContent=result.total?`找到 ${result.total} 张 · 已登记 ${result.installed} 张原版动图`:'没有找到表情，请换个关键词或检查素材安装。';
+      for(const item of result.items){
+        const card=make('article');card.style.cssText='padding:14px;border:1px solid #a1a1aa;border-radius:10px;display:flex;flex-direction:column;gap:8px';
+        const label=make('strong',item.title),meta=make('small',item.id+' · '+item.emotion),hint=make('p',item.context);hint.style.cssText='font-size:13px;line-height:1.6;margin:0;flex:1';
+        card.append(label,meta,hint,ui.button('预览 '+item.title,{onClick:()=>void preview(item)}));grid.append(card);
+      }
+      position.textContent=`第 ${page} / ${pages} 页`;
+    }catch{if(!signal.aborted)status.textContent='读取失败，请稍后重试。';}
+    finally{busy=false;if(!signal.aborted)buttons();}
+  }
+  form.addEventListener('submit',event=>{event.preventDefault();void load(1);},{signal});
+  signal.addEventListener('abort',()=>{previewVersion++;picture.removeAttribute('src');},{once:true});
+  const credit=make('p');credit.style.cssText='font-size:12px;opacity:.75;margin-top:20px';
+  credit.append('表情作者：');const author=make('a','可以叫我云大人 / 雾雪');author.href='https://kiriyuki.com';author.target='_blank';author.rel='noopener noreferrer';credit.append(author,' · 保留署名，仅供非商业使用。');
+  root.append(ui.section('大肥鱼表情','按名称或情绪找图，预览后复制聊天命令。屏幕聊天页支持动图；微信播放效果以手机端为准。'),form,status,selected,grid,nav,credit);
+  buttons();void load(1);
+}
+
+
+export default {panels:{stickers:{mount:mountStickers},preferences:{mount(ctx){
   const {root,ui,signal}=ctx;
   const status=ui.h('div'),message=ui.msgline(),actions=ui.actions();
   const form=document.createElement('form');form.style.cssText='display:grid;gap:16px;max-width:520px;margin:20px 0';

@@ -7,6 +7,7 @@ import { createInterface } from 'node:readline';
 import { shortBeats } from './chat-format.mjs';
 import { attachPreferences, candidate, guidance, KEY } from './preferences.mjs';
 import { VideoRelay } from './video-watch.mjs';
+import { Stickers } from './stickers.mjs';
 
 export const digest = text => createHash('sha256').update(text).digest('hex');
 export function atomic(path, text) {
@@ -57,6 +58,7 @@ export class SharedMemory {
     this.stateFile=join(ctx.dataDir,'dafeiyu-sync.json');
     this.state=json(this.stateFile,{client:randomUUID().replaceAll('-',''),after:0,memoryAfter:0,localCursor:0,files:{},rows:{},memories:{},diaries:[],imported:{}});
     this.transport=new Transport(ctx.cfg); this.busy=false;this.stopped=true;this.status={connected:false};
+    this.stickers=new Stickers(ctx.cfg.stickerRoot||join(dirname(ctx.cfg.helper||'.'),'../assets/memes'));
     this.state.preferencePending ??= [];
   }
   save(){atomic(this.stateFile,JSON.stringify(this.state));}
@@ -93,8 +95,8 @@ export class SharedMemory {
   }
   webUi(){return {
     label:'大肥鱼共享记忆与微信',
-    panels:[{id:'preferences',title:'主动消息设置',getMethods:['state']}],
-    invoke:(panel,method,args)=>this.preferences(panel,method,args),
+    panels:[{id:'preferences',title:'主动消息设置',getMethods:['state']},{id:'stickers',title:'大肥鱼表情',getMethods:['list','preview']}],
+    invoke:(panel,method,args)=>panel==='stickers'?this.stickers.panel(method,args):this.preferences(panel,method,args),
     promptDocs:[{key:'worlds.dafeiyu-sync.envPrompt',title:'共享记忆与微信环境',path:fileURLToPath(new URL('./ENV_PROMPT.md',import.meta.url)),role:'envPrompt'}]};}
   async preferences(panel,method,args=[]){
     if(panel!=='preferences'||!['state','save'].includes(method))throw new Error('未知设置操作');
@@ -113,6 +115,7 @@ export class SharedMemory {
     return this.transport.request(payload);
   }
   tools(){return [
+    ...this.stickers.tools(),
     {name:'shared_preferences_status',description:'读取已经保存并生效的偏好、两端同步版本及待处理数量。',parameters:{type:'object',properties:{},additionalProperties:false},tags:['read','snapshot'],handler:async()=>{try{const r=await this.transport.request({_control:'shared_preferences',client:this.state.client,action:'read'});this.acceptPreferences(r.snapshot);}catch{}return JSON.stringify({preferences:this.state.preferences,pending:this.state.preferencePending.length,connected:this.status.connected});}},
     {name:'shared_preferences_apply',description:'处理当前用户原话中的长期偏好，必须先取得此回执才能说已保存；不能传入自造偏好或替用户写设置。',parameters:{type:'object',properties:{},additionalProperties:false},tags:['write'],barrierAfter:true,handler:async()=>{if(!this.latestPreferenceEvent)return JSON.stringify({status:'failed',receipt:'没有当前用户原话，不能修改偏好。'});const r=await this.processPreferenceEvent(this.latestPreferenceEvent,true);if(r.receipt){this.preferenceBridge.receipt=r.receipt;this.preferenceBridge.spoke=false;}return JSON.stringify(r);}},
     {name:'shared_memory_status',description:'查看最近一次云端同步时间、微信连接和本地待同步状态。',parameters:{type:'object',properties:{},additionalProperties:false},tags:['read','snapshot'],handler:async()=>JSON.stringify({...this.status,localCursor:this.state.localCursor,latestCursor:this.host.store.latestCursor(),counts:this.state.counts})},

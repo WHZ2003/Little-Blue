@@ -25,6 +25,7 @@ compose.override.yaml
 reference/
 assets/user/
 assets/memes/community/
+assets/memes/nekowhale/
 assets/memes/generated/originals/
 models/
 firefly-voice/.venv/

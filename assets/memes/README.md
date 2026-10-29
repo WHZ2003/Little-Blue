@@ -1,5 +1,7 @@
 # DeepSeek 表情素材
 
+新增 **322 张大肥鱼原版 GIF**，来自 [dsh-nekowhale-stickers](https://github.com/Loping151/dsh-nekowhale-stickers/tree/b7b58c0ff347d639fabe87d90d6716c4b3cad185)，与下述旧素材合计 382 张。作者为 [可以叫我云大人 / 雾雪](https://space.bilibili.com/103739)，网站 [kiriyuki.com](https://kiriyuki.com)。原始署名与许可文件在 `nekowhale-meta/`；知识库 CC BY-NC 4.0，GIF 归原作者，仅保留署名的非商业使用，不适用代码 Apache-2.0 许可。执行 `python tools/fetch_nekowhale.py` 安装并验证。`nekowhale.json` 登记 `n001`～`n322`；`nekowhale/` 原始 GIF 被 Git 忽略。接入与使用见 [表情说明](../../docs/memes.md)。
+
 当前共 60 张：19 张社区素材和 41 张新生成表情，其中 51 张开放为自动候选。
 
 `generated/901.webp` 至 `941.webp` 使用内置 `image_gen` 生成，参考社区 010、056 的蓝发鲸鱼女仆形象与表情画风，覆盖问候、确认、庆祝、亲近、惊讶、吐槽、困倦和吃饭等场景。生成提示词、场景和原始输出路径保存在 `generated/prompts.json`；原始 PNG 另保留在本机 `generated/originals/`。WebP 仅作格式编码，没有裁切或重绘。
@@ -12,4 +14,4 @@
 
 `catalog.json` 保存固定版本、编号、标题、Git blob SHA-1 和字节数；`community/` 存放个人本机素材并被 Git 忽略。执行 `python tools/fetch_memes.py` 下载并校验，不执行上游代码。Docker 只读挂载此目录，图片不打进核心镜像。
 
-新增素材需有明确使用来源，并在 catalog 中登记固定编号、校验值和可选的适用场景；不接受模型返回文件路径或图片 URL。更新目录后重启核心加载。当前只支持 WebP 表情，以图片消息发送，非微信官方贴纸商店包。
+新增素材需有明确使用来源，并在清单中登记固定编号、校验值和可选的适用场景；不接受模型返回文件路径或图片 URL。更新目录后重启核心加载。当前支持 WebP 和 GIF，以图片消息发送，非微信官方贴纸商店包。

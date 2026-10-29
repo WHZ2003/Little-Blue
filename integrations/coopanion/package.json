@@ -1,6 +1,6 @@
 {
   "name": "cortico-world-dafeiyu-sync",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "main": "index.mjs",
   "description": "Private DaFeiYu memory and conversation replication over authenticated SSH",

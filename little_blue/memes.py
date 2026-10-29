@@ -12,35 +12,49 @@ MARKER = re.compile(
     r'|【(?:meme|表情)\s*[:：]\s*([^】\r\n]{0,128})】', re.IGNORECASE)
 UNFINISHED_MARKER = re.compile(r'(?:\[\[?|【)(?:meme|表情)\s*[:：][^\]】\r\n]*$', re.IGNORECASE)
 SEND_INTERVAL = 10  # Transport burst guard, not a conversational quota.
+IMAGE_LIMIT = 20 * 1024 * 1024
+
+
+def image_format(data):
+    if data[:6] in (b'GIF87a', b'GIF89a'):
+        return 'gif'
+    if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        return 'webp'
+    return None
 
 
 class MemeCatalog:
     def __init__(self, root=None):
         self.root = Path(root or ROOT)
         self.items = {}
-        try:
-            manifest = json.loads((self.root / 'catalog.json').read_text(encoding='utf-8'))
-            for item in manifest['items'][:100]:
-                if re.fullmatch(r'\d{3}', item['id']) and re.fullmatch(r'[a-f0-9]{40}', item['git_blob_sha']):
-                    self.items[item['id']] = item
-        except (OSError, ValueError, KeyError, TypeError):
-            pass  # Missing optional pack never prevents life or chat.
+        self._verified = {}
+        for name in ('catalog.json', 'nekowhale.json'):
+            try:
+                manifest = json.loads((self.root / name).read_text(encoding='utf-8'))
+                for item in manifest['items'][:1000]:
+                    if re.fullmatch(r'n?\d{3}', item['id']) and re.fullmatch(r'[a-f0-9]{40}', item['git_blob_sha']):
+                        self.items[item['id']] = item
+            except (OSError, ValueError, KeyError, TypeError):
+                pass  # Missing optional pack never prevents life or chat.
 
     def read(self, ident):
         if ident not in self.items:
             raise ValueError('未知表情编号')
         item = self.items[ident]
         source = item.get('source', 'community')
-        if source not in ('community', 'generated'):
+        if source not in ('community', 'generated', 'nekowhale'):
             raise ValueError('表情素材来源无效')
         folder = (self.root / source).resolve()
-        path = folder / (ident + '.webp')
+        fmt = item.get('format', 'webp')
+        if fmt not in ('webp', 'gif'):
+            raise ValueError('表情素材格式无效')
+        path = folder / (ident + '.' + fmt)
         if path.resolve() != path:
             raise ValueError('表情素材路径无效')
         with path.open('rb') as file:
-            data = file.read(2 * 1024 * 1024 + 1)
-        if (len(data) > 2 * 1024 * 1024 or len(data) != item['bytes'] or
-                data[:4] != b'RIFF' or data[8:12] != b'WEBP' or
+            data = file.read(IMAGE_LIMIT + 1)
+        if (len(data) > IMAGE_LIMIT or len(data) != item['bytes'] or
+                image_format(data) != fmt or
                 hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() != item['git_blob_sha']):
             raise ValueError('表情素材校验失败')
         return data
@@ -51,7 +65,12 @@ class MemeCatalog:
             if automatic and not item.get('auto_context'):
                 continue
             try:
-                self.read(item['id'])
+                path = self.root/item.get('source', 'community')/(item['id']+'.'+item.get('format','webp'))
+                stat = path.stat()
+                stamp = (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+                if self._verified.get(item['id']) != stamp:
+                    self.read(item['id'])
+                    self._verified[item['id']] = stamp
             except (OSError, ValueError):
                 continue
             items.append(item)
@@ -64,6 +83,15 @@ class MemeCatalog:
             return available
         if any(word in text for word in ('不用回', '不必回复', '别发表情', '不要发表情')):
             return []
+        pack = [i for i in available if i.get('source') == 'nekowhale']
+        if pack and not avoid_teasing:
+            def score(item):
+                words = [item['title'], item.get('emotion', ''), *item.get('tags', [])]
+                return sum(len(w) for w in words if w and w in text)
+            ranked = sorted(pack, key=score, reverse=True)
+            matched = [i for i in ranked if score(i)]
+            if matched:
+                return matched[:12]
         if avoid_teasing:
             ids = {'909', '916', '906'}
         else:
@@ -81,7 +109,8 @@ class MemeCatalog:
                 (('你好', '在吗'), {'907', '912'}),
             )
             ids = next((ids for words, ids in groups if any(w in text for w in words)), None)
-        return [i for i in available if ids is None or i['id'] in ids]
+        legacy = [i for i in available if i.get('source') != 'nekowhale' and (ids is None or i['id'] in ids)]
+        return legacy if not pack or avoid_teasing else (legacy[:8] + pack[:4])
 
     def prompt(self, text=None, *, avoid_teasing=False):
         choices = [{'id': i['id'], 'caption': i['title'], 'context': i['auto_context']}

@@ -36,7 +36,7 @@ def main():
     write_changed(source/'dafeiyu-chat-format.mjs', (integration/'chat-format.mjs').read_bytes())
     extension = args.app/'data/extensions/node_modules/cortico-world-dafeiyu-sync'
     if extension.is_dir():
-        for name in ('index.mjs', 'chat-format.mjs'):
+        for name in ('index.mjs', 'chat-format.mjs', 'stickers.mjs'):
             target = extension/name
             write_changed(target, (integration/name).read_bytes())
     print('Local speech formatting patch installed')

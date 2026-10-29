@@ -33,7 +33,7 @@ def main():
     integration=Path(__file__).resolve().parents[1]/'integrations/coopanion'
     extension=app/'data/extensions/node_modules/cortico-world-dafeiyu-sync'
     if not extension.is_dir():raise ValueError('Shared memory extension is not installed')
-    for name in ('index.mjs','preferences.mjs','video-watch.mjs','ENV_PROMPT.md','chat-format.mjs','package.json','webui.mjs'):
+    for name in ('index.mjs','preferences.mjs','video-watch.mjs','stickers.mjs','ENV_PROMPT.md','chat-format.mjs','package.json','webui.mjs'):
         write_changed(extension/name,(integration/name).read_bytes())
     speech=app/'resources/app/node_modules/cortico-world-desktop-pet/src/dafeiyu-chat-format.mjs'
     write_changed(speech,(integration/'chat-format.mjs').read_bytes())
