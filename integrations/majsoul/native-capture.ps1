@@ -1,4 +1,4 @@
-param([ValidatePattern('^[0-9a-fA-F]*$')][string]$Handle = '')
+param([ValidatePattern('^[0-9a-fA-F]*$')][string]$Handle = '', [ValidateRange(160000,2304000)][int]$PixelBudget = 640000)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 Add-Type -AssemblyName System.Drawing
@@ -52,7 +52,9 @@ public static class MahjongCapture {
     }
     return high-low>16;
   }
-  public static byte[] Capture(MahjongWindow target) {
+  public static int OutputWidth, OutputHeight;
+  public static byte[] Gray;
+  public static byte[] Capture(MahjongWindow target, int pixelBudget) {
     IntPtr h=new IntPtr(Convert.ToInt64(target.handle,16));
     if (IsIconic(h)) throw new Exception("WINDOW_MINIMIZED");
     Rect r; if (!GetClientRect(h,out r)) throw new Exception("WINDOW_CLOSED");
@@ -68,7 +70,15 @@ public static class MahjongCapture {
       int owner; GetWindowThreadProcessId(h,out owner);
       var title=new StringBuilder(512); GetWindowText(h,title,title.Capacity);
       if (owner!=target.pid || title.ToString()!=target.title || IsIconic(h)) throw new Exception("WINDOW_CHANGED");
-      double scale=Math.Min(1,Math.Min(1920.0/w,1200.0/height));
+      double scale=Math.Min(1,Math.Min(Math.Sqrt((double)pixelBudget/(w*height)),Math.Min(1920.0/w,1200.0/height)));
+      OutputWidth=Math.Max(1,(int)(w*scale)); OutputHeight=Math.Max(1,(int)(height*scale));
+      // Fingerprint the full game window locally. It is never attached to model messages.
+      using (var small=new Bitmap(b,new Size(128,72))) {
+        Gray=new byte[128*72];
+        for (int y=0;y<72;y++) for (int x=0;x<128;x++) {
+          var p=small.GetPixel(x,y); Gray[y*128+x]=(byte)((p.R*299+p.G*587+p.B*114)/1000);
+        }
+      }
       using (var output=new Bitmap(b,new Size((int)(w*scale),(int)(height*scale))))
       using (var stream=new MemoryStream()) {
         ImageCodecInfo codec=null;
@@ -89,8 +99,8 @@ try {
     if ($matches.Count -eq 0) { throw 'WINDOW_NOT_FOUND' }
     if ($matches.Count -gt 1) { throw 'WINDOW_AMBIGUOUS' }
     $target = $matches[0]
-    $bytes = [MahjongCapture]::Capture($target)
-    @{ ok=$true; window=$target; jpeg=[Convert]::ToBase64String($bytes) } | ConvertTo-Json -Compress -Depth 4
+    $bytes = [MahjongCapture]::Capture($target, $PixelBudget)
+    @{ ok=$true; window=$target; jpeg=[Convert]::ToBase64String($bytes); gray=[Convert]::ToBase64String([MahjongCapture]::Gray); width=[MahjongCapture]::OutputWidth; height=[MahjongCapture]::OutputHeight } | ConvertTo-Json -Compress -Depth 4
 } catch {
     @{ ok=$false; error=$_.Exception.Message; windows=$windows } | ConvertTo-Json -Compress -Depth 4
 }

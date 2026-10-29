@@ -26,6 +26,7 @@ export class RemoteWatch {
   }
   private async run(job:{url:string,permitted?:()=>boolean},report:(data:any)=>void){
     const w=this.world,b=w.browser;
+    const initialScenes=Number(w.sceneCount)||0;
     let ticket:any=null,owner:any=null,title='',duration=0,position=0,played=0,frames=0,started=false,finished=false;
     let cleanup='none',failure='open_failed';
     const sameVideo=(url:string)=>{
@@ -67,7 +68,8 @@ export class RemoteWatch {
       if(!(duration>0&&duration<=7200))throw new WatchFailure('unsupported');
       check();w.video=info;w.mode='watching';
       await bounded(b.play(0));check();
-      let last=0,lastAt=this.now(),lastProgress=lastAt,begin=lastAt,sampled=0,resets=0;
+      w.lastObservedT=0;w.startObserving();
+      let last=0,lastAt=this.now(),lastProgress=lastAt,begin=lastAt,sampled=lastAt-5001,resets=0;
       while(true){
         check();
         const pb:any=await bounded(b.playback());check();
@@ -84,6 +86,7 @@ export class RemoteWatch {
             // Only correct it during startup, with ownership intact; discard prior coverage.
             if(at-begin<5000&&played<5&&resets<2){
               check();await bounded(b.seek(0));check();await bounded(b.play(0));check();
+              w.lastObservedT=0;w.startObserving();
               resets++;played=0;last=0;lastAt=this.now();lastProgress=lastAt;await this.sleep(500);continue;
             }
             throw new WatchFailure('incomplete');
@@ -107,6 +110,8 @@ export class RemoteWatch {
       }
     }catch(error){failure=error instanceof WatchFailure?error.message:'open_failed';}
     finally{
+      w.stopObserving();
+      frames=Math.max(frames,(Number(w.sceneCount)||0)-initialScenes);
       const current=b.ownershipTicket();
       if(current?.owner===owner)ticket=current;
       // No more playback/cleanup calls once the page was taken over or replaced.
@@ -114,7 +119,7 @@ export class RemoteWatch {
         if(autoCloseVideoEnabled()||!finished)cleanup=await bounded(b.finishOwnedVideo(ticket),15000).catch(()=> 'failed');
         else cleanup='retained';
       }else if(ticket)cleanup='retained';
-      w.stopObserving();w.mode=cleanup==='closed'?'idle':'browsing';
+      w.mode=cleanup==='closed'?'idle':'browsing';
       if(cleanup==='closed'){w.resetVideo();w.currentBvid=null;w.lastPlayback=null;}
       report({state:finished?'completed':'failed',...(finished?{}:{reason:failure}),title,
         position:Math.min(7205,Math.max(0,position)),duration:Math.min(7200,Math.max(0,duration)),played:Math.min(8000,played),frames,cleanup});

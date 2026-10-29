@@ -13,6 +13,7 @@ from patch_coopanion_majsoul import ROOT, PACKAGE, replace
 from patch_coopanion_majsoul_companion import prepare_companion
 from patch_coopanion_majsoul_native import prepare_native
 from patch_coopanion_majsoul_ui import prepare_ui
+from patch_coopanion_storyboard import shared_files
 
 MARKER = '// DaFeiYu: local strategy v1'
 
@@ -93,6 +94,7 @@ def prepare(package):
     for name in ['strategy.ts', 'local-player.ts', 'ENV_PROMPT.md']:
         changed['src/' + name] = (ROOT / 'integrations/majsoul' / name).read_text(encoding='utf-8')
     changed = prepare_ui(prepare_native(prepare_companion(changed)))
+    changed.update(shared_files())
     # Extension assets are cached immutably by URL. A content-based filename
     # refreshes existing browsers without changing the upstream package version.
     client = changed['src/webui/client.js']
@@ -113,6 +115,7 @@ def main():
     backup = ROOT / 'backups' / ('majsoul-strategy-' + time.strftime('%Y%m%d-%H%M%S') + '-' + str(time.time_ns() % 1_000_000_000))
     for name, content in changed.items():
         dest = args.package / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists():
             saved = backup / name
             saved.parent.mkdir(parents=True, exist_ok=True)

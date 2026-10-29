@@ -132,3 +132,30 @@ test('destination check accepts only the configured official HTTPS DeepSeek prov
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('economy passes bounded budget, deduplicates pixel noise, preserves changed hand and new window', async () => {
+  const f=fixture();const gray=new Uint8Array(128*72).fill(100);
+  let image:NativeFrame={...frame(),gray},budget=0;
+  const watch=new NativeCompanion(()=>true,()=>10,()=>'',()=>true,async(_h,_s,b)=>{budget=b!;return image;});
+  await watch.tick(f.host,0);assert.equal(budget,640000);
+  const first=f.events[0].event.render();assert.match(first.text,/cell 1 = 最新完整牌面/);
+  image={...frame(2),gray:gray.slice()};image.gray![0]++;
+  await watch.tick(f.host,10000);assert.equal(f.events.length,1);assert.equal(watch.status.skipped,1);
+  image.gray!.fill(180,128*60,128*61);
+  await watch.tick(f.host,20000);assert.equal(f.events.length,2);
+  image={...image,window:{...image.window,handle:'456'}};
+  await watch.tick(f.host,30000);assert.equal(f.events.length,3);
+  assert.equal(f.events[1].event.render(),null);
+});
+
+test('expired undelivered static frame can be queued again; losing image support cancels delivery',async()=>{
+  const f=fixture();await f.watch.tick(f.host,0);
+  const original=Date.now;
+  try{
+    Date.now=()=>original()+26000;
+    assert.equal(f.events[0].event.render(),null);
+    await f.watch.tick(f.host,30000);assert.equal(f.events.length,2);
+    f.host.modelFacts.accepts=()=>false;
+    assert.equal(f.events[1].event.render(),null);
+  }finally{Date.now=original;}
+});

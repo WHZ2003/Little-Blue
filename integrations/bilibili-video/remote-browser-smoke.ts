@@ -24,7 +24,8 @@ try{
     return await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.readAsDataURL(new Blob(chunks,{type:'video/webm'}));});
   })()`);
   const cfg=structuredClone(BILIBILI_VIDEO_DEFAULTS);cfg.browser.cdpUrl='http://'+new URL(fixture.wsEndpoint()).host;
-  const world:any=new BilibiliVideoWorld({cfg,timezone:'UTC',dataDir:folder});world.host={pushEvent:async()=>{}};
+  const scenes:any[]=[];
+  const world:any=new BilibiliVideoWorld({cfg,timezone:'UTC',dataDir:folder});world.host={pushEvent:async()=>{},pushDeferred:(event:any)=>{void Promise.resolve(event.render()).then(value=>{if(value)scenes.push(value);});}};
   const actual=world.browser.freshOwnedPage.bind(world.browser);
   let created:any=null;
   world.browser.freshOwnedPage=async()=>{
@@ -45,6 +46,8 @@ try{
   const ended=shared.state.videoReports.find((r:any)=>r.state!=='playing');
   assert.equal(ended?.state,'completed',JSON.stringify(shared.state.videoReports));
   assert.ok(ended.played>=ended.duration*.9);assert.ok(created.isClosed());assert.ok(!user.isClosed()&&!maker.isClosed());
+  assert.ok(scenes.some(s=>s.blobs?.length===1&&s.text.includes('分镜清单')),'remote playback must deliver a real storyboard, including short clips');
+  assert.ok(ended.frames>=1,'receipt must count actual observed storyboard frames');
   const first=ended;
   // A second real playback transfers to the human on a trusted click; never clean that page.
   const reports:any[]=[];const watching=world.remote.start({id:'second',url:job.url},(r:any)=>reports.push(r));
@@ -53,6 +56,6 @@ try{
   assert.equal(reports.at(-1).state,'failed');assert.equal(reports.at(-1).reason,'taken_over');
   assert.ok(!created.isClosed()&&!user.isClosed());
   await world.browser.stop();assert.ok(!created.isClosed()&&!user.isClosed());
-  console.log(JSON.stringify({real_playback:'passed',duration:first.duration,played:first.played,frames:first.frames,
+  console.log(JSON.stringify({real_playback:'passed',duration:first.duration,played:first.played,frames:first.frames,storyboards:scenes.length,
     checks:['claim-before-open','actual-media-playback','started-before-completed','owned-tab-cleanup','user-tab-preserved','trusted-user-takeover-preserved']}));
 }finally{await fixture.close();}

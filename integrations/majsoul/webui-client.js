@@ -89,14 +89,17 @@ export default {
         const save = ui.button('应用设置', { onClick: () => void saveSettings() });
         const saved = el('span', 'ms-muted'); saved.setAttribute('role', 'status');
         const saveRow = el('div', 'ms-actions'); saveRow.append(save, saved);
-        settings.append(el('p', 'ms-muted', '调节看牌频率。相同画面不会重复发送，回复速度也取决于模型。'), frequencyLabel, presets, el('p', 'ms-note', '客户端最短 8 秒；退出陪玩后停止截图。'), saveRow);
+        const economy = el('input'); economy.type = 'checkbox'; economy.setAttribute('aria-label', '客户端省流画面');
+        const economyLabel = el('label', 'ms-form-row'); economyLabel.append(economy, el('span', '', '客户端省流画面'));
+        const economyHelp = el('p', 'ms-note', '保留最新完整牌面，整图最多 64 万像素；跳过近似静止画面。看不清牌时关闭，恢复原清晰度。');
+        settings.append(el('p', 'ms-muted', '调节看牌频率。修改后点击“应用设置”。'), frequencyLabel, presets, economyLabel, economyHelp, el('p', 'ms-note', '客户端最短 8 秒；退出陪玩后停止截图。'), saveRow);
         grid.append(talk, settings);
 
         const advanced = ui.foldSheet('companion-advanced', { title: '高级与诊断', note: '指定客户端窗口、查看网页牌局与详细状态', defaultOpen: false });
         const handle = el('input', 'ms-number ms-handle'); handle.type = 'text'; handle.placeholder = '留空，自动识别唯一的雀魂窗口'; handle.pattern = '[0-9a-fA-F]*'; handle.setAttribute('aria-label', '客户端窗口句柄');
         advanced.body.append(el('p', 'ms-muted', '多个雀魂窗口同时打开时，可以填写提示中的窗口句柄。修改后点击“应用设置”。'), handle);
         const details = el('pre', 'ms-debug'); advanced.body.append(details);
-        for (const input of [frequency, handle]) input.addEventListener('input', () => { settingsDirty = true; saved.textContent = '有未保存的设置'; render(); }, { signal });
+        for (const input of [frequency, handle, economy]) input.addEventListener('input', () => { settingsDirty = true; saved.textContent = '有未保存的设置'; render(); }, { signal });
         ctx.guardLeave?.(() => settingsDirty ? '陪玩设置尚未保存，确定离开？' : null);
         panel.append(style, hero, warning, grid, advanced.el); root.append(panel);
 
@@ -117,6 +120,8 @@ export default {
           stop.hidden = !active; stop.disabled = working;
           refresh.disabled = working || polling;
           for (const input of [frequency, handle, ...presetButtons]) input.disabled = locked;
+          economy.disabled = locked || typeof last?.companionUi?.nativeStoryboard !== 'boolean';
+          economyLabel.hidden = economyHelp.hidden = selected !== 'native';
           save.disabled = locked || !settingsDirty;
           frequency.min = selected === 'native' ? '8' : '5';
           browserTools.hidden = selected !== 'browser';
@@ -129,6 +134,7 @@ export default {
             metric(isNative ? '游戏窗口' : '游戏浏览器', isNative ? n.windowTitle || '等待识别雀魂窗口' : last.browserConnected ? '已连接专用 Edge' : '尚未连接'),
             metric('观察状态', !active ? '已停止' : isNative ? n.error ? '暂时看不到画面' : n.watching ? '正在看你的牌' : '正在获取窗口' : last.connected ? '已收到牌局' : '等待连接或开局'),
             metric(isNative ? '最近观察' : '牌局状态', isNative ? time(n.capturedAt) : last.observation?.reason || (last.observation?.active ? '进行中' : '等待开局')),
+            ...(isNative && n.storyboard ? [metric('画面发送', `${last.companionUi?.nativeStoryboard === false ? '原清晰度' : '省流'} · 已发送 ${n.delivered || 0} · 去重 ${n.skipped || 0}`)] : []),
           );
           if (!failed) {
             const problem = !compatible ? '界面已更新，后台还需重启一次。请在局间重启大肥鱼后刷新。' : active ? isNative ? n.error : last.error : '';
@@ -146,6 +152,7 @@ export default {
           if (!settingsDirty) {
             frequency.value = String(state.companionUi?.intervalSec ?? 10);
             handle.value = state.companionUi?.windowHandle || '';
+            economy.checked = state.companionUi?.nativeStoryboard !== false;
           }
           render();
         }
@@ -174,7 +181,9 @@ export default {
           if (working || signal.aborted || !frequency.reportValidity() || !handle.reportValidity()) return;
           working = true; revision++; render(); saved.textContent = '正在保存…';
           try {
-            await ctx.setConfig('world:majsoul', { 'worlds.majsoul.companionIntervalSec': Number(frequency.value), 'worlds.majsoul.nativeWindow': handle.value.trim() });
+            const patch = { 'worlds.majsoul.companionIntervalSec': Number(frequency.value), 'worlds.majsoul.nativeWindow': handle.value.trim() };
+            if (selected === 'native' && typeof last?.companionUi?.nativeStoryboard === 'boolean') patch['worlds.majsoul.nativeStoryboard'] = economy.checked;
+            await ctx.setConfig('world:majsoul', patch);
             if (signal.aborted) return;
             settingsDirty = false; accept(await ctx.invoke('state')); saved.textContent = '已保存，立即生效';
           } catch (error) { saved.textContent = '保存未确认'; report(error); }

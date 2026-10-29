@@ -10,7 +10,7 @@ function fixture(options:any={}){
     videoInfo:async()=>({bvid:'BV1LHHw6pERT',p:1,title:'测试视频',duration:3}),play:async()=>{},seek:async()=>{options.resume=false;options.delayedResume=false;offset=clock;},
     playback:async()=>({t:options.resume?2.5:options.delayedResume&&clock>=1000?3:options.seek?3:Math.min((clock-offset)/1000,3),duration:3,ended:options.seek||clock-offset>=3000}),
     sample:async()=>({jpeg:'real-frame-placeholder'}),finishOwnedVideo:async()=>{closed++;return 'closed';}};
-  const w:any={host:{},mode:'idle',browser:b,stopObserving:()=>{},resetVideo:()=>{}};
+  const w:any={host:{},mode:'idle',browser:b,startObserving:()=>{w.observing=true;},stopObserving:()=>{w.observing=false;},resetVideo:()=>{}};
   const reports:any[]=[];
   (globalThis as any)[Symbol.for('dafeiyu.shared-preferences')]={values:{auto_close_video_tabs:true}};
   const remote=new RemoteWatch(w,async ms=>{clock+=ms;if(options.takeover&&clock>=500)owner.eligible=false;if(options.rewrite&&clock===500)ticket={owner,url:URL+'&tracking=changed'};},()=>clock);
@@ -20,6 +20,7 @@ test('verified playback emits started then completed; only owned tab cleaned',as
   const f=fixture();await f.remote.start({id:'test',url:URL},r=>f.reports.push(r));
   assert.deepEqual(f.reports.map(r=>r.state),['playing','completed']);
   assert.ok(f.reports[1].played>=2.7);assert.equal(f.closed,1);assert.equal(f.w.mode,'idle');
+  assert.equal(f.w.observing,false);
 });
 test('failure and seek-to-end never become completed',async()=>{
   for(const opt of [{failOpen:true},{seek:true}]){

@@ -27,5 +27,9 @@ def prepare_ui(changed):
                     "lamps: this.nativeMode ? [{ label: '客户端陪玩', state: !this.ctx.cfg.companionMode ? 'offline' : this.native.status.error ? 'error' : this.native.status.watching ? 'online' : 'loading', hint: !this.ctx.cfg.companionMode ? '已停止观察' : this.native.status.error || (this.native.status.watching ? '正在观察 ' + this.native.status.windowTitle : '正在获取雀魂窗口') }] : [{ label: '牌局桥接', state: this.game.error ? 'error' : this.game.browserConnected ? 'online' : 'offline', hint: this.game.error || state.reason || '已接收公开牌局。' }],")
         w = replace(w, "panels: [{ id: 'game', title: '游戏状态', description: 'state 查询公开状态；connect 打开游戏；attach 附着桥接并保留页面。登录和开局由操作者完成。', getMethods: ['state'] }],", "panels: [{ id: 'game', title: '陪我玩', description: '选择客户端或网页，一键陪玩；只观察、聊天和建议，由你亲自操作。', getMethods: ['state'] }],")
         changed['src/world.ts'] = w
+    if 'nativeStoryboard: this.ctx.cfg.nativeStoryboard' not in changed['src/world.ts']:
+        changed['src/world.ts'] = replace(changed['src/world.ts'],
+            'return { version: 1, intervalSec:',
+            'return { version: 1, nativeStoryboard: this.ctx.cfg.nativeStoryboard !== false, intervalSec:')
     changed['src/webui/client.js'] = (ROOT / 'integrations/majsoul/webui-client.js').read_text(encoding='utf-8')
     return changed

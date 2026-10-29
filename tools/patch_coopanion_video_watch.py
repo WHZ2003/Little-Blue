@@ -2,9 +2,15 @@
 import argparse
 from pathlib import Path
 from patch_coopanion_video_cleanup import patch,write_atomic,ROOT
+from patch_coopanion_storyboard import prepare_video, prepare_video_ui
+import shutil
+import time
+import json
 
 
 def install(package):
+    if json.loads((package / 'package.json').read_text(encoding='utf-8'))['version'] != '0.2.2':
+        raise ValueError('Review the video/storyboard integration for this plugin version first')
     patch(package)
     src=package/'src';path=src/'world.ts';text=path.read_text(encoding='utf-8')
     browser=src/'browser.ts';body=browser.read_text(encoding='utf-8')
@@ -46,6 +52,19 @@ def install(package):
     if '微信观看任务通道' not in body:
         body+='\n\n微信观看任务通道会在桌面在线且视频插件空闲时自动打开专用视频页并播放，以实际播放器进度报告开始和结束。此时不得重复开视频或自行回微信说看完；只读字幕不等于观看。用户接管、断线、打不开或播放卡住会报告失败，不重复执行旧任务。\n'
         write_atomic(prompt,body.encode())
+    names = ['src/world.ts', 'src/browser.ts', 'src/config.ts', 'src/ENV_PROMPT.md']
+    prepared = prepare_video_ui(package, prepare_video({n: (package / n).read_text(encoding='utf-8') for n in names}))
+    backup = ROOT / 'backups' / ('video-storyboard-' + str(time.time_ns()))
+    for name, content in prepared.items():
+        dest = package / name
+        if dest.exists() and dest.read_text(encoding='utf-8') == content:
+            continue
+        if dest.exists():
+            saved = backup / name
+            saved.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(dest, saved)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        write_atomic(dest, content.encode('utf-8'))
 
 
 if __name__=='__main__':

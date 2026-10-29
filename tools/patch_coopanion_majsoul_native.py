@@ -69,6 +69,15 @@ def prepare_native(changed):
         ui = replace(ui, '          attach.disabled = loading || !!last?.busy;', "          attach.disabled = loading || !!last?.busy || last?.companionSource === 'native';")
         ui = replace(ui, '点击“陪我玩”，你打牌，她聊天和给建议。', '独立客户端请点“客户端陪玩”：只截雀魂窗口发给 DeepSeek，由你自己操作。退出陪玩即停止截图。')
         changed['src/webui/client.js'] = ui
+    if 'nativeStoryboard' not in changed['src/config.ts']:
+        cfg = changed['src/config.ts']
+        cfg = replace(cfg, 'nativeWindow: string;', 'nativeWindow: string; nativeStoryboard: boolean;')
+        cfg = replace(cfg, "nativeWindow: '',", "nativeWindow: '', nativeStoryboard: true,")
+        cfg = replace(cfg, "    'worlds.majsoul.nativeWindow':", "    'worlds.majsoul.nativeStoryboard': { type: 'boolean', title: '客户端省流画面', 'x-hot': true, description: '默认开启。最新完整牌面限制64万像素，跳过近似静止画面；关闭恢复原截图尺寸。' },\n    'worlds.majsoul.nativeWindow':")
+        changed['src/config.ts'] = cfg
+        changed['src/world.ts'] = replace(changed['src/world.ts'],
+            '() => deepSeekDestination(this.ctx.botDir));',
+            '() => deepSeekDestination(this.ctx.botDir), undefined, () => this.ctx.cfg.nativeStoryboard !== false);')
     for name in ['native-companion.ts']:
         changed['src/' + name] = (ROOT / 'integrations/majsoul' / name).read_text(encoding='utf-8')
     changed['setup/native-capture.ps1'] = (ROOT / 'integrations/majsoul/native-capture.ps1').read_text(encoding='utf-8')
